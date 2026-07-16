@@ -127,8 +127,8 @@ func getArgName(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func createArgs(name string, etcdOptions []string) []string {
-	defaultArgs := defaultArgs(name)
+func createArgs(name string, etcdOptions []string, tlsEnabled bool) []string {
+	defaultArgs := defaultArgs(name, tlsEnabled)
 	if len(etcdOptions) > 0 {
 		for i := range etcdOptions {
 			argName := getArgName(etcdOptions[i])
@@ -175,11 +175,13 @@ func createHeadlessServiceIfNotExist(ctx context.Context, logger logr.Logger, c 
 }
 
 // peerEndpointForOrdinalIndex returns the member name and peer URL for a given
-// ordinal, used both to build ETCD_INITIAL_CLUSTER and to call AddMember.
+// ordinal, used both to build ETCD_INITIAL_CLUSTER and to call AddMember. The
+// peer URL scheme reflects the cluster's TLS configuration (https when TLS is
+// configured, http otherwise).
 func peerEndpointForOrdinalIndex(ec *ecv1alpha1.EtcdCluster, index int) (string, string) {
 	name := fmt.Sprintf("%s-%d", ec.Name, index)
-	return name, fmt.Sprintf("http://%s-%d.%s.%s.svc.cluster.local:2380",
-		ec.Name, index, ec.Name, ec.Namespace)
+	return name, fmt.Sprintf("%s://%s-%d.%s.%s.svc.cluster.local:2380",
+		clusterScheme(clusterTLSEnabled(ec)), ec.Name, index, ec.Name, ec.Namespace)
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
@@ -57,6 +58,7 @@ type reconcileState struct {
 	pods           []*corev1.Pod                // member pods owned by this cluster, sorted by ordinal
 	memberListResp *clientv3.MemberListResponse // member list fetched from the etcd cluster
 	memberHealth   []etcdutils.EpHealth         // health information for each etcd member
+	tlsConfig      *tls.Config                  // etcd client TLS config used by every etcdutils call in this loop (nil for non-TLS clusters)
 }
 
 // +kubebuilder:rbac:groups=operator.etcd.io,resources=etcdclusters,verbs=get;list;watch;create;update;patch;delete
@@ -211,7 +213,7 @@ func (r *EtcdClusterReconciler) performHealthChecks(ctx context.Context, s *reco
 	logger := log.FromContext(ctx)
 	logger.Info("Now checking health of the cluster members")
 	var err error
-	s.memberListResp, s.memberHealth, err = healthCheck(s.cluster.Name, s.cluster.Namespace, s.pods, logger)
+	s.memberListResp, s.memberHealth, err = healthCheck(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster), s.tlsConfig, logger)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
@@ -275,10 +277,10 @@ func (r *EtcdClusterReconciler) reconcileClusterState(ctx context.Context, s *re
 			logger.Info("Learner found", "learnerID", learner, "learnerStatus", learnerStatus)
 			if etcdutils.IsLearnerReady(leaderStatus, learnerStatus) {
 				logger.Info("Learner is ready to be promoted to voting member", "learnerID", learner)
-				eps := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods)
+				eps := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster))
 				// Exclude the learner (last ordinal) from the endpoint list used for promotion.
 				eps = eps[:(len(eps) - 1)]
-				if err := etcdutils.PromoteLearner(etcdutils.ClientConfig{Endpoints: eps}, learner); err != nil {
+				if err := etcdutils.PromoteLearner(etcdutils.ClientConfig{Endpoints: eps, TLS: s.tlsConfig}, learner); err != nil {
 					return ctrl.Result{}, err
 				}
 			} else {
@@ -293,14 +295,14 @@ func (r *EtcdClusterReconciler) reconcileClusterState(ctx context.Context, s *re
 		return ctrl.Result{}, nil
 	}
 
-	eps := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods)
+	eps := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster))
 
 	if currentPodCount < int32(s.cluster.Spec.Size) {
 		// Scale out: add a new learner member to etcd, then create its pod.
 		nextOrdinal := int(currentPodCount)
 		_, peerURL := peerEndpointForOrdinalIndex(s.cluster, nextOrdinal)
 		logger.Info("[Scale out] adding a new learner member to etcd cluster", "peerURL", peerURL)
-		if _, err := etcdutils.AddMember(etcdutils.ClientConfig{Endpoints: eps}, []string{peerURL}, true); err != nil {
+		if _, err := etcdutils.AddMember(etcdutils.ClientConfig{Endpoints: eps, TLS: s.tlsConfig}, []string{peerURL}, true); err != nil {
 			return ctrl.Result{}, err
 		}
 		logger.Info("Learner member added successfully", "peerURL", peerURL)
@@ -320,7 +322,7 @@ func (r *EtcdClusterReconciler) reconcileClusterState(ctx context.Context, s *re
 		logger.Info("[Scale in] removing one member", "memberID", memberID, "pod", podToRemove.Name)
 
 		epsForRemoval := eps[:len(eps)-1]
-		if err := etcdutils.RemoveMember(etcdutils.ClientConfig{Endpoints: epsForRemoval}, memberID); err != nil {
+		if err := etcdutils.RemoveMember(etcdutils.ClientConfig{Endpoints: epsForRemoval, TLS: s.tlsConfig}, memberID); err != nil {
 			return ctrl.Result{}, err
 		}
 
