@@ -123,8 +123,13 @@ func (r *EtcdClusterReconciler) fetchAndValidateState(ctx context.Context, req c
 	}
 
 	if ec.Spec.TLS != nil {
-		if err := createClientCertificate(ctx, ec, r.Client); err != nil {
-			logger.Error(err, "Failed to create Client Certificate.")
+		// Ensure every TLS Secret for the cluster is ready *before* listing
+		// pods or attempting any etcd client call. For the auto provider this
+		// also creates the shared CA Secret; for cert-manager it ensures each
+		// leaf Certificate CR.
+		if err := ensureAutoTLSCertificates(ctx, ec, r.Client); err != nil {
+			logger.Error(err, "Failed to ensure TLS certificates; will retry next reconcile")
+			return nil, ctrl.Result{RequeueAfter: requeueDuration}, err
 		}
 	} else {
 		logger.Error(nil, fmt.Sprintf(
@@ -133,7 +138,9 @@ func (r *EtcdClusterReconciler) fetchAndValidateState(ctx context.Context, req c
 		))
 	}
 
-	// Build the operator's etcd-client TLS config (from the server cert Secret)
+	// Build the operator's etcd-client TLS config from the cluster's client
+	// certificate Secret. Returns a nil config (and nil error) when the
+	// cluster has no TLS configured.
 	clientTLS, tlsErr := r.buildReconcileClientTLS(ctx, ec)
 	if tlsErr != nil && ec.Spec.TLS != nil {
 		logger.Error(tlsErr, "Failed to build client TLS config; will retry next reconcile")

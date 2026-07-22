@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -152,6 +153,7 @@ func TestCreateAutoCertificateConfig(t *testing.T) {
 									ValidityDuration: "720h",
 									AltNames: ecv1alpha1.AltNames{
 										DNSNames: []string{"custom1.example.com", "custom2.example.com"},
+										IPs:      []net.IP{net.ParseIP("10.0.0.1")},
 									},
 								},
 							},
@@ -165,8 +167,10 @@ func TestCreateAutoCertificateConfig(t *testing.T) {
 				ValidityDuration: 720 * time.Hour,
 				AltNames: certInterface.AltNames{
 					DNSNames: []string{"custom1.example.com", "custom2.example.com"},
-					IPs:      make([]net.IP, 2),
+					IPs:      []net.IP{net.ParseIP("10.0.0.1")},
 				},
+				Role:             certInterface.CertificateRoleServer,
+				SigningCASecret:  "test-cluster-ca-tls",
 			},
 			wantErr: false,
 		},
@@ -198,7 +202,7 @@ func TestCreateAutoCertificateConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := createAutoCertificateConfig(tt.ec)
+			result, err := createAutoCertificateConfig(tt.ec, certInterface.CertificateRoleServer)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Nil(t, result)
@@ -252,8 +256,8 @@ func TestCreateCMCertificateConfig(t *testing.T) {
 				ValidityDuration: 1440 * time.Hour,
 				AltNames: certInterface.AltNames{
 					DNSNames: []string{"cm1.example.com", "cm2.example.com"},
-					IPs:      make([]net.IP, 2),
 				},
+				Role: certInterface.CertificateRoleServer,
 				ExtraConfig: map[string]any{
 					"issuerName": "test-issuer",
 					"issuerKind": "ClusterIssuer",
@@ -279,7 +283,7 @@ func TestCreateCMCertificateConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := createCMCertificateConfig(tt.ec)
+			result, err := createCMCertificateConfig(tt.ec, certInterface.CertificateRoleServer)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Nil(t, result)
@@ -354,4 +358,264 @@ func TestVerifySecretHasCA(t *testing.T) {
 		assert.Contains(t, err.Error(), "ca.crt")
 		assert.Contains(t, err.Error(), "cert-manager")
 	})
+}
+
+// ---------------------------------------------------------------------------
+// CA Secret naming and role-aware configuration helpers
+// ---------------------------------------------------------------------------
+
+func TestGetCASecretName(t *testing.T) {
+	assert.Equal(t, "etcd-test-ca-tls", getCASecretName("etcd-test"))
+	assert.Equal(t, "cluster-ca-tls", getCASecretName("cluster"))
+}
+
+func TestCreateAutoCertificateConfig_PropagatesRoleAndCA(t *testing.T) {
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-x", Namespace: "ns-x"},
+		Spec: ecv1alpha1.EtcdClusterSpec{
+			TLS: &ecv1alpha1.TLSCertificate{
+				Provider: string(certificate.Auto),
+				ProviderCfg: ecv1alpha1.ProviderConfig{
+					AutoCfg: &ecv1alpha1.ProviderAutoConfig{
+						CommonConfig: ecv1alpha1.CommonConfig{},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name string
+		role certInterface.CertificateRole
+	}{
+		{name: "client role", role: certInterface.CertificateRoleClient},
+		{name: "server role", role: certInterface.CertificateRoleServer},
+		{name: "peer role", role: certInterface.CertificateRolePeer},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := createAutoCertificateConfig(ec, tt.role)
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			assert.Equal(t, tt.role, cfg.Role)
+			assert.Equal(t, getCASecretName(ec.Name), cfg.SigningCASecret)
+		})
+	}
+}
+
+func TestCreateAutoCertificateConfig_PreservesIPAddresses(t *testing.T) {
+	ip1 := net.ParseIP("10.0.0.1")
+	ip2 := net.ParseIP("fd00::1")
+
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-ip", Namespace: "ns"},
+		Spec: ecv1alpha1.EtcdClusterSpec{
+			TLS: &ecv1alpha1.TLSCertificate{
+				Provider: string(certificate.Auto),
+				ProviderCfg: ecv1alpha1.ProviderConfig{
+					AutoCfg: &ecv1alpha1.ProviderAutoConfig{
+						CommonConfig: ecv1alpha1.CommonConfig{
+							AltNames: ecv1alpha1.AltNames{
+								DNSNames: []string{"a.example.com", "b.example.com"},
+								IPs:      []net.IP{ip1, ip2},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cfg, err := createAutoCertificateConfig(ec, certInterface.CertificateRoleServer)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.Len(t, cfg.AltNames.IPs, 2)
+	assert.True(t, cfg.AltNames.IPs[0].Equal(ip1), "first IP must be the configured 10.0.0.1, not a zero-value placeholder")
+	assert.True(t, cfg.AltNames.IPs[1].Equal(ip2), "second IP must be the configured fd00::1, not a zero-value placeholder")
+}
+
+func TestCreateCMCertificateConfig_PreservesIPAddresses(t *testing.T) {
+	ip := net.ParseIP("192.0.2.10")
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-cm", Namespace: "ns"},
+		Spec: ecv1alpha1.EtcdClusterSpec{
+			TLS: &ecv1alpha1.TLSCertificate{
+				Provider: string(certificate.CertManager),
+				ProviderCfg: ecv1alpha1.ProviderConfig{
+					CertManagerCfg: &ecv1alpha1.ProviderCertManagerConfig{
+						CommonConfig: ecv1alpha1.CommonConfig{
+							AltNames: ecv1alpha1.AltNames{
+								IPs: []net.IP{ip},
+							},
+						},
+						IssuerName: "i",
+						IssuerKind: "Issuer",
+					},
+				},
+			},
+		},
+	}
+
+	cfg, err := createCMCertificateConfig(ec, certInterface.CertificateRoleServer)
+	require.NoError(t, err)
+	require.Len(t, cfg.AltNames.IPs, 1)
+	assert.True(t, cfg.AltNames.IPs[0].Equal(ip))
+}
+
+// ---------------------------------------------------------------------------
+// CA-first orchestration
+// ---------------------------------------------------------------------------
+
+func TestEnsureAutoTLSCertificates_CreatesCAFirstAndSetsOwnership(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, ecv1alpha1.AddToScheme(scheme))
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-ca-first", Namespace: "default", UID: "uid-ca-first"},
+		Spec: ecv1alpha1.EtcdClusterSpec{
+			TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)},
+		},
+	}
+
+	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+
+	// All four Secrets must exist.
+	for _, name := range []string{
+		getCASecretName(ec.Name),
+		getClientCertName(ec.Name),
+		getServerCertName(ec.Name),
+		getPeerCertName(ec.Name),
+	} {
+		s := &corev1.Secret{}
+		require.NoError(t, cli.Get(t.Context(), client.ObjectKey{Name: name, Namespace: ec.Namespace}, s),
+			"missing TLS Secret %s after ensure", name)
+		require.Len(t, s.OwnerReferences, 1, "TLS Secret %s must carry an owner reference", name)
+		assert.Equal(t, ec.Name, s.OwnerReferences[0].Name)
+	}
+}
+
+func TestEnsureAutoTLSCertificates_PreservesCAOnRepeat(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, ecv1alpha1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-repeat", Namespace: "default", UID: "uid-repeat"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
+	}
+
+	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	caSecret := &corev1.Secret{}
+	require.NoError(t, cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, caSecret))
+	originalCAUID := caSecret.UID
+
+	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	after := &corev1.Secret{}
+	require.NoError(t, cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, after))
+	assert.Equal(t, originalCAUID, after.UID, "shared CA Secret must not be replaced across reconciles")
+}
+
+func TestEnsureAutoTLSCertificates_SkipsForPlaintext(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-plain", Namespace: "default"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{}, // no TLS
+	}
+
+	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+
+	for _, name := range []string{
+		getCASecretName(ec.Name),
+		getClientCertName(ec.Name),
+		getServerCertName(ec.Name),
+		getPeerCertName(ec.Name),
+	} {
+		s := &corev1.Secret{}
+		err := cli.Get(t.Context(), client.ObjectKey{Name: name, Namespace: ec.Namespace}, s)
+		require.True(t, err != nil && k8serrors.IsNotFound(err),
+			"plaintext cluster must not create TLS Secret %s", name)
+	}
+}
+
+func TestEnsureAutoTLSCertificates_DelegatesToCertManagerPath(t *testing.T) {
+	// Cert-manager path requires the cert-manager CRDs. The CRD not being
+	// registered is itself proof that the controller does not go through the
+	// auto-provider CA ensure. We assert that the CA Secret is not created
+	// when TLS.Provider is cert-manager.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-cm", Namespace: "default"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.CertManager)}},
+	}
+
+	err := ensureAutoTLSCertificates(t.Context(), ec, cli)
+	// The cert-manager path will error because the fake client does not know
+	// about Certificate CRDs, but the CA Secret must not be planted in either
+	// branch.
+	require.Error(t, err)
+	s := &corev1.Secret{}
+	getErr := cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, s)
+	require.True(t, k8serrors.IsNotFound(getErr),
+		"cert-manager cluster must not create an auto CA Secret")
+}
+
+func TestApplyEtcdMemberCerts_NoOpForAuto(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-noop", Namespace: "default"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
+	}
+	require.NoError(t, applyEtcdMemberCerts(t.Context(), ec, cli))
+	s := &corev1.Secret{}
+	err := cli.Get(t.Context(), client.ObjectKey{Name: getServerCertName(ec.Name), Namespace: ec.Namespace}, s)
+	require.True(t, k8serrors.IsNotFound(err), "applyEtcdMemberCerts must not create Secrets for auto provider")
+}
+
+// ---------------------------------------------------------------------------
+// buildClientTLSConfig uses the client Secret
+// ---------------------------------------------------------------------------
+
+func TestBuildClientTLSConfig_UsesClientSecret(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, ecv1alpha1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-tls", Namespace: "default"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
+	}
+
+	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+
+	cfg, err := buildClientTLSConfig(t.Context(), ec, cli)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.Len(t, cfg.Certificates, 1)
+	require.NotNil(t, cfg.RootCAs)
+}
+
+func TestBuildClientTLSConfig_FailsWhenClientSecretMissing(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, ecv1alpha1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-tls", Namespace: "default"},
+		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
+	}
+
+	_, err := buildClientTLSConfig(t.Context(), ec, cli)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client certificate")
 }

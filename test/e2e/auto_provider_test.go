@@ -34,9 +34,13 @@ const (
 func TestAutoProvider(t *testing.T) {
 	feature := features.New("Auto Provider Certificate").WithLabel("app", string(certificate.Auto))
 
-	cmConfig := &interfaces.Config{
+	const caName = "sample-cert-ca-tls"
+
+	leafConfig := &interfaces.Config{
 		CommonName:       autoCertificateName,
 		ValidityDuration: autoCertificateValidity,
+		SigningCASecret:  caName,
+		Role:             interfaces.CertificateRoleServer,
 	}
 
 	feature.Setup(
@@ -49,12 +53,28 @@ func TestAutoProvider(t *testing.T) {
 			return ctx
 		})
 
+	feature.Assess("Ensure CA secret",
+		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			cl := cfg.Client()
+			prov := auto.New(cl.Resources().GetControllerRuntimeClient())
+			caProvider, ok := prov.(interfaces.CertificateAuthorityProvider)
+			if !ok {
+				t.Fatalf("auto provider does not implement the CertificateAuthorityProvider capability")
+			}
+			caKey := client.ObjectKey{Name: caName, Namespace: autoCertificateNamespace}
+			err := caProvider.EnsureCASecret(ctx, caKey, autoCertificateValidity)
+			if err != nil {
+				t.Fatalf("Auto Provider CA Secret could not be created: %v", err)
+			}
+			return ctx
+		})
+
 	feature.Assess("Ensure certificate",
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			cl := cfg.Client()
 			acProvider := auto.New(cl.Resources().GetControllerRuntimeClient())
 			secretKey := client.ObjectKey{Name: autoCertificateName, Namespace: autoCertificateNamespace}
-			err := acProvider.EnsureCertificateSecret(ctx, secretKey, cmConfig)
+			err := acProvider.EnsureCertificateSecret(ctx, secretKey, leafConfig)
 			if err != nil {
 				t.Fatalf("Auto Provider Certificate could not be created: %v", err)
 			}
@@ -66,7 +86,7 @@ func TestAutoProvider(t *testing.T) {
 			cl := cfg.Client()
 			acProvider := auto.New(cl.Resources().GetControllerRuntimeClient())
 			secretKey := client.ObjectKey{Name: autoCertificateName, Namespace: autoCertificateNamespace}
-			err := acProvider.ValidateCertificateSecret(ctx, secretKey, cmConfig)
+			err := acProvider.ValidateCertificateSecret(ctx, secretKey, leafConfig)
 			if err != nil {
 				t.Fatalf("Failed to validate Auto Provider Certificate secret: %v", err)
 			}
@@ -78,7 +98,7 @@ func TestAutoProvider(t *testing.T) {
 			cl := cfg.Client()
 			acProvider := auto.New(cl.Resources().GetControllerRuntimeClient())
 			secretKey := client.ObjectKey{Name: cmCertificateName, Namespace: cmCertificateNamespace}
-			err := acProvider.EnsureCertificateSecret(ctx, secretKey, cmConfig)
+			err := acProvider.EnsureCertificateSecret(ctx, secretKey, leafConfig)
 			if err != nil {
 				t.Fatalf("Auto Provider Certificate could not be created: %v", err)
 			}
@@ -86,7 +106,7 @@ func TestAutoProvider(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Auto Certificate not found: %v", err)
 			}
-			if !reflect.DeepEqual(config, cmConfig) {
+			if !reflect.DeepEqual(config, leafConfig) {
 				t.Fatalf("Auto Certificate config does not match with the given config")
 			}
 			return ctx
@@ -212,6 +232,7 @@ func TestClusterAutoCertCreation(t *testing.T) {
 func validateSecretExists(ctx context.Context, client klient.Client,
 	etcdClusterName, etcdClusterNamespace, resourceType string,
 ) (bool, error) {
+	caCertName := fmt.Sprintf("%s-ca-tls", etcdClusterName)
 	clientCertName := fmt.Sprintf("%s-client-tls", etcdClusterName)
 	serverCertName := fmt.Sprintf("%s-server-tls", etcdClusterName)
 	peerCertName := fmt.Sprintf("%s-peer-tls", etcdClusterName)
@@ -229,6 +250,15 @@ func validateSecretExists(ctx context.Context, client klient.Client,
 	runtimeObj, err := obj.(k8s.Object)
 	if !err {
 		return false, fmt.Errorf("object does not implement runtime.Object: %T", obj)
+	}
+
+	// The shared CA Secret must be present before any leaf Secret is
+	// considered ready; the controller enforces this ordering.
+	if err := client.Resources().Get(ctx, caCertName, etcdClusterNamespace, runtimeObj); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get CA %s: %v", resourceType, err)
 	}
 
 	if err := client.Resources().Get(ctx, clientCertName, etcdClusterNamespace, runtimeObj); err != nil {

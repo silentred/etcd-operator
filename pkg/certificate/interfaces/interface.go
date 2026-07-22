@@ -72,9 +72,26 @@ type Config struct {
 	AltNames         AltNames
 	ValidityDuration time.Duration
 	CABundleSecret   string
+	SigningCASecret  string
+	Role             CertificateRole
 
 	// ExtraConfig contains provider specific configurations.
 	ExtraConfig map[string]any
+}
+
+// CertificateRole identifies the purpose of a certificate issued by a provider.
+type CertificateRole string
+
+const (
+	CertificateRoleClient CertificateRole = "client"
+	CertificateRoleServer CertificateRole = "server"
+	CertificateRolePeer   CertificateRole = "peer"
+)
+
+// CertificateAuthorityProvider is an optional provider capability for providers
+// that manage a signing CA independently from leaf certificate Secrets.
+type CertificateAuthorityProvider interface {
+	EnsureCASecret(ctx context.Context, secretKey client.ObjectKey, validity time.Duration) error
 }
 
 type Provider interface {

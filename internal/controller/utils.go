@@ -215,6 +215,13 @@ func getPeerCertName(etcdClusterName string) string {
 	return fmt.Sprintf("%s-%s-tls", etcdClusterName, "peer")
 }
 
+// getCASecretName returns the deterministic, operator-managed Secret name that
+// holds the signing CA certificate and private key for the given cluster.
+// Only the auto provider uses this Secret; the cert-manager provider does not.
+func getCASecretName(etcdClusterName string) string {
+	return fmt.Sprintf("%s-ca-tls", etcdClusterName)
+}
+
 func parseValidityDuration(customizedDuration string, defaultDuration time.Duration) (time.Duration, error) {
 	if customizedDuration == "" {
 		return defaultDuration, nil
@@ -226,7 +233,7 @@ func parseValidityDuration(customizedDuration string, defaultDuration time.Durat
 	return duration, nil
 }
 
-func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Config, error) {
+func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster, role certInterface.CertificateRole) (*certInterface.Config, error) {
 	cmConfig := ec.Spec.TLS.ProviderCfg.CertManagerCfg
 	if cmConfig == nil {
 		return nil, fmt.Errorf("cert-manager configuration is not present")
@@ -241,7 +248,7 @@ func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Confi
 	if cmConfig.AltNames.DNSNames != nil {
 		getAltNames = certInterface.AltNames{
 			DNSNames: cmConfig.AltNames.DNSNames,
-			IPs:      make([]net.IP, len(cmConfig.AltNames.DNSNames)),
+			IPs:      append([]net.IP(nil), cmConfig.AltNames.IPs...),
 		}
 	} else {
 		defaultDNSNames := []string{
@@ -256,6 +263,7 @@ func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Confi
 		Organization:     cmConfig.Organization,
 		ValidityDuration: duration,
 		AltNames:         getAltNames,
+		Role:             role,
 		ExtraConfig: map[string]any{
 			"issuerName": cmConfig.IssuerName,
 			"issuerKind": cmConfig.IssuerKind,
@@ -263,7 +271,7 @@ func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Confi
 	}, nil
 }
 
-func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Config, error) {
+func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster, role certInterface.CertificateRole) (*certInterface.Config, error) {
 	autoConfig := ec.Spec.TLS.ProviderCfg.AutoCfg
 	if autoConfig == nil {
 		autoConfig = &ecv1alpha1.ProviderAutoConfig{
@@ -283,7 +291,7 @@ func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Con
 	if autoConfig.AltNames.DNSNames != nil {
 		altNames = certInterface.AltNames{
 			DNSNames: autoConfig.AltNames.DNSNames,
-			IPs:      make([]net.IP, len(autoConfig.AltNames.DNSNames)),
+			IPs:      append([]net.IP(nil), autoConfig.AltNames.IPs...),
 		}
 	} else {
 		defaultDNSNames := []string{
@@ -298,10 +306,12 @@ func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Con
 		Organization:     autoConfig.Organization,
 		ValidityDuration: duration,
 		AltNames:         altNames,
+		Role:            role,
+		SigningCASecret: getCASecretName(ec.Name),
 	}, nil
 }
 
-func createCertificate(ec *ecv1alpha1.EtcdCluster, ctx context.Context, c client.Client, certName string) error {
+func createCertificate(ec *ecv1alpha1.EtcdCluster, ctx context.Context, c client.Client, certName string, role certInterface.CertificateRole) error {
 	providerName := ec.Spec.TLS.Provider
 	if providerName == "" {
 		providerName = string(certificate.Auto)
@@ -319,7 +329,7 @@ func createCertificate(ec *ecv1alpha1.EtcdCluster, ctx context.Context, c client
 
 			switch certificate.ProviderType(providerName) {
 			case certificate.Auto:
-				autoConfig, err := createAutoCertificateConfig(ec)
+				autoConfig, err := createAutoCertificateConfig(ec, role)
 				if err != nil {
 					return fmt.Errorf("error creating auto certificate config: %w", err)
 				}
@@ -328,7 +338,7 @@ func createCertificate(ec *ecv1alpha1.EtcdCluster, ctx context.Context, c client
 				}
 				return nil
 			case certificate.CertManager:
-				cmConfig, err := createCMCertificateConfig(ec)
+				cmConfig, err := createCMCertificateConfig(ec, role)
 				if err != nil {
 					return fmt.Errorf("error creating cert-manager certificate config: %w", err)
 				}
@@ -348,7 +358,7 @@ func createCertificate(ec *ecv1alpha1.EtcdCluster, ctx context.Context, c client
 
 func createClientCertificate(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
 	certName := getClientCertName(ec.Name)
-	if err := createCertificate(ec, ctx, c, certName); err != nil {
+	if err := createCertificate(ec, ctx, c, certName, certInterface.CertificateRoleClient); err != nil {
 		return err
 	}
 	return patchCertificateSecret(ctx, ec, c, certName)
@@ -356,7 +366,7 @@ func createClientCertificate(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c 
 
 func createServerCertificate(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
 	serverCertName := getServerCertName(ec.Name)
-	if err := createCertificate(ec, ctx, c, serverCertName); err != nil {
+	if err := createCertificate(ec, ctx, c, serverCertName, certInterface.CertificateRoleServer); err != nil {
 		return err
 	}
 	return patchCertificateSecret(ctx, ec, c, serverCertName)
@@ -364,20 +374,88 @@ func createServerCertificate(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c 
 
 func createPeerCertificate(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
 	peerCertName := getPeerCertName(ec.Name)
-	if err := createCertificate(ec, ctx, c, peerCertName); err != nil {
+	if err := createCertificate(ec, ctx, c, peerCertName, certInterface.CertificateRolePeer); err != nil {
 		return err
 	}
 	return patchCertificateSecret(ctx, ec, c, peerCertName)
 }
 
 func applyEtcdMemberCerts(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
-	if ec.Spec.TLS != nil {
-		if err := createServerCertificate(ctx, ec, c); err != nil {
-			return err
-		}
-		return createPeerCertificate(ctx, ec, c)
+	if ec.Spec.TLS == nil {
+		return nil
+	}
+	providerName := ec.Spec.TLS.Provider
+	if providerName == "" || providerName == string(certificate.Auto) {
+		// The auto provider ensures every leaf (including client/server/peer) up
+		// front via ensureAutoTLSCertificates. By the time createMemberPod is
+		// reached, the Secrets are already present and validated.
+		return nil
+	}
+	if err := createServerCertificate(ctx, ec, c); err != nil {
+		return err
+	}
+	return createPeerCertificate(ctx, ec, c)
+}
+
+// ensureAutoTLSCertificates prepares the per-cluster shared CA Secret and
+// every leaf Secret (client, server, peer) for an auto-provider TLS cluster.
+// The function is idempotent and safe to call on every reconciliation: the CA
+// is only created when absent, and existing valid leaves are not regenerated.
+// The shared-CA-first ordering means any error from the CA ensure path is
+// surfaced before the controller can create a member Pod.
+func ensureAutoTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
+	if ec.Spec.TLS == nil {
+		return nil
+	}
+	providerName := ec.Spec.TLS.Provider
+	if providerName == "" {
+		providerName = string(certificate.Auto)
+	}
+	if providerName != string(certificate.Auto) {
+		// Cert-manager keeps its per-leaf flow: each create*Certificate call
+		// independently ensures its Certificate CR and resulting Secret.
+		return ensureCertManagerTLSCertificates(ctx, ec, c)
+	}
+
+	prov, err := certificate.NewProvider(certificate.Auto, c)
+	if err != nil {
+		return fmt.Errorf("build auto certificate provider: %w", err)
+	}
+	caProvider, ok := prov.(certInterface.CertificateAuthorityProvider)
+	if !ok {
+		return fmt.Errorf("auto provider does not implement the CertificateAuthorityProvider capability")
+	}
+
+	caKey := client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}
+	if err := caProvider.EnsureCASecret(ctx, caKey, certInterface.DefaultAutoValidity); err != nil {
+		return fmt.Errorf("ensure shared CA secret %s/%s: %w", ec.Namespace, getCASecretName(ec.Name), err)
+	}
+	if err := patchCertificateSecret(ctx, ec, c, getCASecretName(ec.Name)); err != nil {
+		return fmt.Errorf("patch ownerReference for CA secret %s: %w", getCASecretName(ec.Name), err)
+	}
+
+	if err := createClientCertificate(ctx, ec, c); err != nil {
+		return fmt.Errorf("create client certificate: %w", err)
+	}
+	if err := createServerCertificate(ctx, ec, c); err != nil {
+		return fmt.Errorf("create server certificate: %w", err)
+	}
+	if err := createPeerCertificate(ctx, ec, c); err != nil {
+		return fmt.Errorf("create peer certificate: %w", err)
 	}
 	return nil
+}
+
+// ensureCertManagerTLSCertificates creates the three leaf Secrets for a
+// cert-manager TLS cluster, preserving the existing per-leaf behaviour.
+func ensureCertManagerTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
+	if err := createClientCertificate(ctx, ec, c); err != nil {
+		return fmt.Errorf("create client certificate: %w", err)
+	}
+	if err := createServerCertificate(ctx, ec, c); err != nil {
+		return fmt.Errorf("create server certificate: %w", err)
+	}
+	return createPeerCertificate(ctx, ec, c)
 }
 
 func patchCertificateSecret(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client, certSecretName string) error {
@@ -413,12 +491,14 @@ func verifySecretHasCA(secret *corev1.Secret, provider string) error {
 }
 
 // buildClientTLSConfig assembles the operator's TLS config from the cluster's
-// server certificate Secret. The operator reuses the server identity (tls.crt/tls.key)
-// and trusts the server CA (ca.crt), so the control plane can reach a TLS-enabled etcd client listener.
+// client certificate Secret. The operator presents the client identity
+// (tls.crt/tls.key) and trusts the shared CA (ca.crt) so the control plane
+// can reach a TLS-enabled etcd client listener without reusing the server
+// Secret as a client identity.
 func buildClientTLSConfig(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) (*tls.Config, error) {
 	secret := &corev1.Secret{}
-	if err := c.Get(ctx, client.ObjectKey{Name: getServerCertName(ec.Name), Namespace: ec.Namespace}, secret); err != nil {
-		return nil, fmt.Errorf("failed to get server certificate secret for client TLS: %w", err)
+	if err := c.Get(ctx, client.ObjectKey{Name: getClientCertName(ec.Name), Namespace: ec.Namespace}, secret); err != nil {
+		return nil, fmt.Errorf("failed to get client certificate secret for client TLS: %w", err)
 	}
 
 	if err := verifySecretHasCA(secret, ec.Spec.TLS.Provider); err != nil {
@@ -427,21 +507,21 @@ func buildClientTLSConfig(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c cli
 
 	certData, ok := secret.Data[corev1.TLSCertKey]
 	if !ok || len(certData) == 0 {
-		return nil, fmt.Errorf("server certificate secret %s is missing tls.crt", secret.Name)
+		return nil, fmt.Errorf("client certificate secret %s is missing tls.crt", secret.Name)
 	}
 	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok || len(keyData) == 0 {
-		return nil, fmt.Errorf("server certificate secret %s is missing tls.key", secret.Name)
+		return nil, fmt.Errorf("client certificate secret %s is missing tls.key", secret.Name)
 	}
 
 	keyPair, err := tls.X509KeyPair(certData, keyData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load server keypair for client TLS: %w", err)
+		return nil, fmt.Errorf("failed to load client keypair for client TLS: %w", err)
 	}
 
 	caPool := x509.NewCertPool()
 	if !caPool.AppendCertsFromPEM(secret.Data[corev1.ServiceAccountRootCAKey]) {
-		return nil, fmt.Errorf("failed to parse ca.crt from server certificate secret %s", secret.Name)
+		return nil, fmt.Errorf("failed to parse ca.crt from client certificate secret %s", secret.Name)
 	}
 
 	return &tls.Config{
