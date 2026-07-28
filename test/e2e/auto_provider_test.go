@@ -57,12 +57,8 @@ func TestAutoProvider(t *testing.T) {
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			cl := cfg.Client()
 			prov := auto.New(cl.Resources().GetControllerRuntimeClient())
-			caProvider, ok := prov.(interfaces.CertificateAuthorityProvider)
-			if !ok {
-				t.Fatalf("auto provider does not implement the CertificateAuthorityProvider capability")
-			}
 			caKey := client.ObjectKey{Name: caName, Namespace: autoCertificateNamespace}
-			err := caProvider.EnsureCASecret(ctx, caKey, autoCertificateValidity)
+			err := prov.EnsureCASecret(ctx, caKey, autoCertificateValidity)
 			if err != nil {
 				t.Fatalf("Auto Provider CA Secret could not be created: %v", err)
 			}

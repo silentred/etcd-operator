@@ -19,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	interfaces "go.etcd.io/etcd-operator/pkg/certificate/interfaces"
 )
 
 const (
@@ -311,7 +309,3 @@ func TestEnsureCASecretRejectsEmptySecretKey(t *testing.T) {
 	require.Error(t, err)
 	_ = cli
 }
-
-// Compile-time guard: the auto provider implements both interfaces.
-var _ interfaces.Provider = (*Provider)(nil)
-var _ interfaces.CertificateAuthorityProvider = (*Provider)(nil)

@@ -124,10 +124,10 @@ func (r *EtcdClusterReconciler) fetchAndValidateState(ctx context.Context, req c
 
 	if ec.Spec.TLS != nil {
 		// Ensure every TLS Secret for the cluster is ready *before* listing
-		// pods or attempting any etcd client call. For the auto provider this
-		// also creates the shared CA Secret; for cert-manager it ensures each
-		// leaf Certificate CR.
-		if err := ensureAutoTLSCertificates(ctx, ec, r.Client); err != nil {
+		// pods or attempting any etcd client call. Both the auto and the
+		// cert-manager provider ensure their CA Secret via the base
+		// Provider.EnsureCASecret contract before any leaf is created.
+		if err := ensureClusterTLS(ctx, ec, r.Client); err != nil {
 			logger.Error(err, "Failed to ensure TLS certificates; will retry next reconcile")
 			return nil, ctrl.Result{RequeueAfter: requeueDuration}, err
 		}

@@ -43,6 +43,201 @@ func New(c client.Client) interfaces.Provider {
 	}
 }
 
+// EnsureCASecret materializes the per-cluster trust-root Secret `<cluster>-ca-tls`
+// for a cert-manager-managed EtcdCluster. The Secret is Opaque and contains only
+// the public CA certificate of the configured cert-manager Issuer/ClusterIssuer
+// under the `ca.crt` data key; the private key is owned by cert-manager and
+// never exposed to the operator.
+//
+// Behaviour:
+//   - absent Secret: create it with the current Issuer CA content.
+//   - present and matching: return success without modifying the Secret.
+//   - present and content differs: refresh the Secret with the current Issuer CA
+//     (covers Issuer rotation / re-issuance).
+//   - present but wrong Type: return an error; do not mutate.
+//   - missing leaf Certificate CR: return an actionable error so the controller
+//     can retry after `EnsureCertificateSecret` creates the first leaf.
+//
+// The `validity` parameter is intentionally ignored: cert-manager controls the
+// CA's validity window via the configured Issuer, and the operator cannot
+// override it from a Secret.
+func (cm *CertManagerProvider) EnsureCASecret(ctx context.Context, secretKey client.ObjectKey, _ time.Duration) error {
+	if secretKey.Name == "" || secretKey.Namespace == "" {
+		return fmt.Errorf("CA secret key requires both name and namespace, got %+v", secretKey)
+	}
+
+	issuerName, issuerKind, err := cm.resolveClusterIssuerRef(ctx, secretKey.Namespace)
+	if err != nil {
+		return err
+	}
+	caPEM, err := cm.fetchIssuerCASecret(ctx, issuerName, issuerKind, secretKey.Namespace)
+	if err != nil {
+		return err
+	}
+
+	existing := &corev1.Secret{}
+	getErr := cm.Get(ctx, secretKey, existing)
+	if getErr == nil {
+		if existing.Type != corev1.SecretTypeOpaque {
+			return fmt.Errorf("CA secret %s/%s must be of type Opaque, got %s",
+				secretKey.Namespace, secretKey.Name, existing.Type)
+		}
+		if bytes.Equal(existing.Data["ca.crt"], caPEM) && len(existing.Data["ca.key"]) == 0 {
+			return nil
+		}
+		updated := existing.DeepCopy()
+		if updated.Data == nil {
+			updated.Data = map[string][]byte{}
+		}
+		updated.Data["ca.crt"] = caPEM
+		delete(updated.Data, "ca.key")
+		if updateErr := cm.Update(ctx, updated); updateErr != nil {
+			if k8serrors.IsConflict(updateErr) {
+				// Lost an update race; let the next reconcile converge.
+				return fmt.Errorf("CA secret %s/%s update conflict, retry: %w",
+					secretKey.Namespace, secretKey.Name, updateErr)
+			}
+			return fmt.Errorf("failed to refresh CA secret %s/%s: %w",
+				secretKey.Namespace, secretKey.Name, updateErr)
+		}
+		return nil
+	}
+	if !k8serrors.IsNotFound(getErr) {
+		return fmt.Errorf("failed to fetch CA secret %s/%s: %w",
+			secretKey.Namespace, secretKey.Name, getErr)
+	}
+
+	newSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretKey.Name,
+			Namespace: secretKey.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"ca.crt": caPEM,
+		},
+	}
+	if createErr := cm.Create(ctx, newSecret); createErr != nil {
+		if k8serrors.IsAlreadyExists(createErr) {
+			return nil
+		}
+		return fmt.Errorf("failed to create CA secret %s/%s: %w",
+			secretKey.Namespace, secretKey.Name, createErr)
+	}
+	return nil
+}
+
+// resolveClusterIssuerRef determines the IssuerRef the cluster's leaves were
+// signed against by listing cert-manager Certificate CRs in the cluster namespace.
+// It returns the first matching issuerRef from a leaf whose name follows the
+// `<cluster>-{client,server,peer}-tls` convention. When no leaf exists yet,
+// it returns an actionable error mentioning the expected leaf names so the
+// controller can retry after `EnsureCertificateSecret`.
+func (cm *CertManagerProvider) resolveClusterIssuerRef(ctx context.Context, namespace string) (string, string, error) {
+	certs := &certmanagerv1.CertificateList{}
+	if err := cm.List(ctx, certs, client.InNamespace(namespace)); err != nil {
+		return "", "", fmt.Errorf("failed to list cert-manager Certificate CRs in %s: %w", namespace, err)
+	}
+	if len(certs.Items) == 0 {
+		return "", "", fmt.Errorf("no cert-manager Certificate CR found in namespace %s; "+
+			"controller must ensure at least one leaf (e.g. %s-%s-tls) before EnsureCASecret can resolve the Issuer",
+			namespace, "<cluster>", "client")
+	}
+	// Prefer leaves whose names match the well-known cluster leaf pattern.
+	leafSuffixes := []string{"-client-tls", "-server-tls", "-peer-tls"}
+	for _, suffix := range leafSuffixes {
+		for i := range certs.Items {
+			c := &certs.Items[i]
+			if !strings.HasSuffix(c.Name, suffix) {
+				continue
+			}
+			name := c.Spec.IssuerRef.Name
+			kind := c.Spec.IssuerRef.Kind
+			if kind == "" {
+				kind = "Issuer"
+			}
+			if name == "" {
+				continue
+			}
+			return name, kind, nil
+		}
+	}
+	// Fall back to the first Certificate's issuerRef so we don't break unusual setups.
+	for i := range certs.Items {
+		c := &certs.Items[i]
+		name := c.Spec.IssuerRef.Name
+		kind := c.Spec.IssuerRef.Kind
+		if kind == "" {
+			kind = "Issuer"
+		}
+		if name != "" {
+			return name, kind, nil
+		}
+	}
+	return "", "", fmt.Errorf("cert-manager Certificate CRs found in %s but none carry a usable issuerRef", namespace)
+}
+
+// fetchIssuerCASecret resolves an Issuer/ClusterIssuer to its CA certificate
+// PEM. The Issuer's `spec.ca.secretName` points at a Secret whose `ca.crt`
+// (or `tls.crt` fallback) holds the PEM-encoded CA certificate. For
+// ClusterIssuer the Secret lookup is cluster-scoped; for Issuer the lookup
+// happens in the Issuer's namespace.
+func (cm *CertManagerProvider) fetchIssuerCASecret(ctx context.Context, issuerName, issuerKind, namespace string) ([]byte, error) {
+	var secretName string
+	switch issuerKind {
+	case "ClusterIssuer":
+		clusterIssuer := &certmanagerv1.ClusterIssuer{}
+		if err := cm.Get(ctx, client.ObjectKey{Name: issuerName}, clusterIssuer); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, fmt.Errorf("ClusterIssuer %s not found", issuerName)
+			}
+			return nil, fmt.Errorf("failed to fetch ClusterIssuer %s: %w", issuerName, err)
+		}
+		if clusterIssuer.Spec.CA == nil {
+			return nil, fmt.Errorf("ClusterIssuer %s has no CA configuration (spec.ca)", issuerName)
+		}
+		secretName = clusterIssuer.Spec.CA.SecretName
+		if secretName == "" {
+			return nil, fmt.Errorf("ClusterIssuer %s spec.ca.secretName is empty", issuerName)
+		}
+	case "Issuer", "":
+		issuer := &certmanagerv1.Issuer{}
+		if err := cm.Get(ctx, client.ObjectKey{Name: issuerName, Namespace: namespace}, issuer); err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, fmt.Errorf("Issuer %s/%s not found", namespace, issuerName)
+			}
+			return nil, fmt.Errorf("failed to fetch Issuer %s/%s: %w", namespace, issuerName, err)
+		}
+		if issuer.Spec.CA == nil {
+			return nil, fmt.Errorf("Issuer %s/%s has no CA configuration (spec.ca)", namespace, issuerName)
+		}
+		secretName = issuer.Spec.CA.SecretName
+		if secretName == "" {
+			return nil, fmt.Errorf("Issuer %s/%s spec.ca.secretName is empty", namespace, issuerName)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported Issuer kind: %s", issuerKind)
+	}
+
+	secret := &corev1.Secret{}
+	if err := cm.Get(ctx, client.ObjectKey{Name: secretName, Namespace: namespace}, secret); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Issuer CA secret %s/%s (referenced by %s %s) not found",
+				namespace, secretName, issuerKind, issuerName)
+		}
+		return nil, fmt.Errorf("failed to fetch Issuer CA secret %s/%s: %w", namespace, secretName, err)
+	}
+
+	if ca, ok := secret.Data["ca.crt"]; ok && len(ca) > 0 {
+		return ca, nil
+	}
+	if crt, ok := secret.Data["tls.crt"]; ok && len(crt) > 0 {
+		return crt, nil
+	}
+	return nil, fmt.Errorf("Issuer CA secret %s/%s contains neither ca.crt nor tls.crt",
+		namespace, secretName)
+}
+
 func (cm *CertManagerProvider) EnsureCertificateSecret(ctx context.Context, secretKey client.ObjectKey,
 	cfg *interfaces.Config) error {
 	cmCertificate := &certmanagerv1.Certificate{}

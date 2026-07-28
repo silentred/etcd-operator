@@ -22,7 +22,6 @@ type Provider struct {
 }
 
 var _ interfaces.Provider = (*Provider)(nil)
-var _ interfaces.CertificateAuthorityProvider = (*Provider)(nil)
 
 func New(c client.Client) interfaces.Provider {
 	return &Provider{

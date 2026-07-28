@@ -216,8 +216,9 @@ func getPeerCertName(etcdClusterName string) string {
 }
 
 // getCASecretName returns the deterministic, operator-managed Secret name that
-// holds the signing CA certificate and private key for the given cluster.
-// Only the auto provider uses this Secret; the cert-manager provider does not.
+// holds the cluster's trust-root CA. Both auto and cert-manager providers
+// materialize this Secret: the auto provider writes ca.crt + ca.key; the
+// cert-manager provider writes only the Issuer's public ca.crt.
 func getCASecretName(etcdClusterName string) string {
 	return fmt.Sprintf("%s-ca-tls", etcdClusterName)
 }
@@ -306,8 +307,8 @@ func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster, role certInterface.
 		Organization:     autoConfig.Organization,
 		ValidityDuration: duration,
 		AltNames:         altNames,
-		Role:            role,
-		SigningCASecret: getCASecretName(ec.Name),
+		Role:             role,
+		SigningCASecret:  getCASecretName(ec.Name),
 	}, nil
 }
 
@@ -384,11 +385,13 @@ func applyEtcdMemberCerts(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c cli
 	if ec.Spec.TLS == nil {
 		return nil
 	}
+	// ensureClusterTLS runs ahead of Pod creation for every provider, so by the
+	// time createMemberPod is reached the client/server/peer Secrets are already
+	// ensured. We only need the cert-manager fast-path that ensures server/peer
+	// immediately before Pod creation for any non-auto provider that bypassed
+	// ensureClusterTLS (legacy reconcile flows).
 	providerName := ec.Spec.TLS.Provider
 	if providerName == "" || providerName == string(certificate.Auto) {
-		// The auto provider ensures every leaf (including client/server/peer) up
-		// front via ensureAutoTLSCertificates. By the time createMemberPod is
-		// reached, the Secrets are already present and validated.
 		return nil
 	}
 	if err := createServerCertificate(ctx, ec, c); err != nil {
@@ -397,13 +400,16 @@ func applyEtcdMemberCerts(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c cli
 	return createPeerCertificate(ctx, ec, c)
 }
 
-// ensureAutoTLSCertificates prepares the per-cluster shared CA Secret and
-// every leaf Secret (client, server, peer) for an auto-provider TLS cluster.
-// The function is idempotent and safe to call on every reconciliation: the CA
-// is only created when absent, and existing valid leaves are not regenerated.
-// The shared-CA-first ordering means any error from the CA ensure path is
-// surfaced before the controller can create a member Pod.
-func ensureAutoTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
+// ensureClusterTLS prepares the per-cluster trust-root CA Secret and every
+// leaf Secret (client, server, peer) for a TLS-enabled EtcdCluster. The function
+// is idempotent and safe to call on every reconciliation: the CA is created if
+// absent, preserved if valid, refreshed if stale (cert-manager only); existing
+// valid leaves are not regenerated. The CA-first ordering means any error from
+// the CA ensure path is surfaced before the controller can create a member Pod.
+//
+// Both auto and cert-manager providers implement the base Provider.EnsureCASecret
+// contract, so this function takes the same path for every provider.
+func ensureClusterTLS(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
 	if ec.Spec.TLS == nil {
 		return nil
 	}
@@ -411,24 +417,15 @@ func ensureAutoTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, 
 	if providerName == "" {
 		providerName = string(certificate.Auto)
 	}
-	if providerName != string(certificate.Auto) {
-		// Cert-manager keeps its per-leaf flow: each create*Certificate call
-		// independently ensures its Certificate CR and resulting Secret.
-		return ensureCertManagerTLSCertificates(ctx, ec, c)
-	}
 
-	prov, err := certificate.NewProvider(certificate.Auto, c)
+	prov, err := certificate.NewProvider(certificate.ProviderType(providerName), c)
 	if err != nil {
-		return fmt.Errorf("build auto certificate provider: %w", err)
-	}
-	caProvider, ok := prov.(certInterface.CertificateAuthorityProvider)
-	if !ok {
-		return fmt.Errorf("auto provider does not implement the CertificateAuthorityProvider capability")
+		return fmt.Errorf("build %s certificate provider: %w", providerName, err)
 	}
 
 	caKey := client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}
-	if err := caProvider.EnsureCASecret(ctx, caKey, certInterface.DefaultAutoValidity); err != nil {
-		return fmt.Errorf("ensure shared CA secret %s/%s: %w", ec.Namespace, getCASecretName(ec.Name), err)
+	if err := prov.EnsureCASecret(ctx, caKey, certInterface.DefaultAutoValidity); err != nil {
+		return fmt.Errorf("ensure CA secret %s/%s: %w", ec.Namespace, getCASecretName(ec.Name), err)
 	}
 	if err := patchCertificateSecret(ctx, ec, c, getCASecretName(ec.Name)); err != nil {
 		return fmt.Errorf("patch ownerReference for CA secret %s: %w", getCASecretName(ec.Name), err)
@@ -444,18 +441,6 @@ func ensureAutoTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, 
 		return fmt.Errorf("create peer certificate: %w", err)
 	}
 	return nil
-}
-
-// ensureCertManagerTLSCertificates creates the three leaf Secrets for a
-// cert-manager TLS cluster, preserving the existing per-leaf behaviour.
-func ensureCertManagerTLSCertificates(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client) error {
-	if err := createClientCertificate(ctx, ec, c); err != nil {
-		return fmt.Errorf("create client certificate: %w", err)
-	}
-	if err := createServerCertificate(ctx, ec, c); err != nil {
-		return fmt.Errorf("create server certificate: %w", err)
-	}
-	return createPeerCertificate(ctx, ec, c)
 }
 
 func patchCertificateSecret(ctx context.Context, ec *ecv1alpha1.EtcdCluster, c client.Client, certSecretName string) error {

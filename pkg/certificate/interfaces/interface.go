@@ -88,13 +88,32 @@ const (
 	CertificateRolePeer   CertificateRole = "peer"
 )
 
-// CertificateAuthorityProvider is an optional provider capability for providers
-// that manage a signing CA independently from leaf certificate Secrets.
-type CertificateAuthorityProvider interface {
-	EnsureCASecret(ctx context.Context, secretKey client.ObjectKey, validity time.Duration) error
-}
-
 type Provider interface {
+	// EnsureCASecret ensures the cluster trust-root Secret is available
+	// in Kubernetes. The Secret is named `secretKey.Name` in `secretKey.Namespace`
+	// and is the single uniform trust root both auto and cert-manager providers
+	// materialize for a TLS-enabled EtcdCluster.
+	//
+	// Implementations:
+	//   - auto: generates a per-cluster signing CA and persists the certificate
+	//     and private key in the Secret (data keys `ca.crt` and `ca.key`). The
+	//     `validity` parameter controls the generated CA's `NotAfter`.
+	//   - cert-manager: resolves the configured Issuer/ClusterIssuer and copies
+	//     the Issuer's public CA certificate into the Secret (data key `ca.crt`
+	//     only; the private key is owned by cert-manager and never exposed).
+	//     The `validity` parameter is ignored for cert-manager.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and deadlines.
+	//   - secretKey: ObjectKey containing the name and namespace of the
+	//     cluster trust-root Secret to ensure (typically `<cluster>-ca-tls`).
+	//   - validity: Requested CA validity. Honored by auto; ignored by
+	//     cert-manager (the Issuer controls its own CA validity).
+	//
+	// Returns:
+	//   - nil if the Secret is ensured, or an error otherwise.
+	EnsureCASecret(ctx context.Context, secretKey client.ObjectKey, validity time.Duration) error
+
 	// EnsureCertificateSecret ensures the specified certificate is
 	// available as a Secret in Kubernetes. If the Secret does not
 	// exist, it will be created.

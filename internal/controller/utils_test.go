@@ -1,11 +1,21 @@
 package controller
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -169,8 +179,8 @@ func TestCreateAutoCertificateConfig(t *testing.T) {
 					DNSNames: []string{"custom1.example.com", "custom2.example.com"},
 					IPs:      []net.IP{net.ParseIP("10.0.0.1")},
 				},
-				Role:             certInterface.CertificateRoleServer,
-				SigningCASecret:  "test-cluster-ca-tls",
+				Role:            certInterface.CertificateRoleServer,
+				SigningCASecret: "test-cluster-ca-tls",
 			},
 			wantErr: false,
 		},
@@ -480,7 +490,7 @@ func TestEnsureAutoTLSCertificates_CreatesCAFirstAndSetsOwnership(t *testing.T) 
 		},
 	}
 
-	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	require.NoError(t, ensureClusterTLS(t.Context(), ec, cli))
 
 	// All four Secrets must exist.
 	for _, name := range []string{
@@ -507,12 +517,12 @@ func TestEnsureAutoTLSCertificates_PreservesCAOnRepeat(t *testing.T) {
 		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
 	}
 
-	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	require.NoError(t, ensureClusterTLS(t.Context(), ec, cli))
 	caSecret := &corev1.Secret{}
 	require.NoError(t, cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, caSecret))
 	originalCAUID := caSecret.UID
 
-	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	require.NoError(t, ensureClusterTLS(t.Context(), ec, cli))
 	after := &corev1.Secret{}
 	require.NoError(t, cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, after))
 	assert.Equal(t, originalCAUID, after.UID, "shared CA Secret must not be replaced across reconciles")
@@ -527,7 +537,7 @@ func TestEnsureAutoTLSCertificates_SkipsForPlaintext(t *testing.T) {
 		Spec:       ecv1alpha1.EtcdClusterSpec{}, // no TLS
 	}
 
-	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	require.NoError(t, ensureClusterTLS(t.Context(), ec, cli))
 
 	for _, name := range []string{
 		getCASecretName(ec.Name),
@@ -555,7 +565,7 @@ func TestEnsureAutoTLSCertificates_DelegatesToCertManagerPath(t *testing.T) {
 		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.CertManager)}},
 	}
 
-	err := ensureAutoTLSCertificates(t.Context(), ec, cli)
+	err := ensureClusterTLS(t.Context(), ec, cli)
 	// The cert-manager path will error because the fake client does not know
 	// about Certificate CRDs, but the CA Secret must not be planted in either
 	// branch.
@@ -564,6 +574,100 @@ func TestEnsureAutoTLSCertificates_DelegatesToCertManagerPath(t *testing.T) {
 	getErr := cli.Get(t.Context(), client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, s)
 	require.True(t, k8serrors.IsNotFound(getErr),
 		"cert-manager cluster must not create an auto CA Secret")
+}
+
+// generateCertTestCA builds a throwaway self-signed CA certificate for the
+// cert-manager controller tests below.
+func generateCertTestCA(t *testing.T) (certPEM, keyPEM []byte) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	require.NoError(t, err)
+	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serial, err := rand.Int(rand.Reader, serialLimit)
+	require.NoError(t, err)
+	tmpl := x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "test-cm-ca"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &priv.PublicKey, priv)
+	require.NoError(t, err)
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	require.NoError(t, err)
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+}
+
+func TestEnsureClusterTLS_CertManagerMaterializesCASecret(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, ecv1alpha1.AddToScheme(scheme))
+	require.NoError(t, certv1.AddToScheme(scheme))
+
+	certPEM, _ := generateCertTestCA(t)
+
+	const issuerName = "cm-test-issuer"
+	const issuerSecret = "cm-test-issuer-ca"
+	namespace := "default"
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ctx := context.Background()
+
+	// Plant the cert-manager Issuer and the Secret it points at.
+	require.NoError(t, cli.Create(ctx, &certv1.Issuer{
+		TypeMeta:   metav1.TypeMeta{Kind: "Issuer"},
+		ObjectMeta: metav1.ObjectMeta{Name: issuerName, Namespace: namespace},
+		Spec: certv1.IssuerSpec{
+			IssuerConfig: certv1.IssuerConfig{
+				CA: &certv1.CAIssuer{SecretName: issuerSecret},
+			},
+		},
+	}))
+	require.NoError(t, cli.Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: issuerSecret, Namespace: namespace},
+		Type:       corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"ca.crt":  certPEM,
+			"tls.crt": certPEM,
+		},
+	}))
+	// Plant one leaf Certificate CR referencing the Issuer so the cert-manager
+	// provider's resolveClusterIssuerRef can find it.
+	require.NoError(t, cli.Create(ctx, &certv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-cm-client-tls", Namespace: namespace},
+		Spec: certv1.CertificateSpec{
+			SecretName: "etcd-cm-client-tls",
+			IssuerRef:  cmmeta.IssuerReference{Name: issuerName, Kind: "Issuer"},
+		},
+	}))
+
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "etcd-cm", Namespace: namespace, UID: "uid-cm"},
+		Spec: ecv1alpha1.EtcdClusterSpec{
+			TLS: &ecv1alpha1.TLSCertificate{
+				Provider: string(certificate.CertManager),
+				ProviderCfg: ecv1alpha1.ProviderConfig{
+					CertManagerCfg: &ecv1alpha1.ProviderCertManagerConfig{IssuerName: issuerName, IssuerKind: "Issuer"},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, ensureClusterTLS(ctx, ec, cli))
+
+	// The cert-manager provider must have materialized the cluster trust-root
+	// Secret with the Issuer CA under ca.crt and no ca.key.
+	caSecret := &corev1.Secret{}
+	require.NoError(t, cli.Get(ctx, client.ObjectKey{Name: getCASecretName(ec.Name), Namespace: ec.Namespace}, caSecret),
+		"ensureClusterTLS must invoke EnsureCASecret for the cert-manager provider")
+	assert.Equal(t, corev1.SecretTypeOpaque, caSecret.Type)
+	assert.Equal(t, certPEM, caSecret.Data["ca.crt"])
+	_, hasKey := caSecret.Data["ca.key"]
+	assert.False(t, hasKey, "cert-manager trust-root Secret must not carry ca.key")
 }
 
 func TestApplyEtcdMemberCerts_NoOpForAuto(t *testing.T) {
@@ -595,7 +699,7 @@ func TestBuildClientTLSConfig_UsesClientSecret(t *testing.T) {
 		Spec:       ecv1alpha1.EtcdClusterSpec{TLS: &ecv1alpha1.TLSCertificate{Provider: string(certificate.Auto)}},
 	}
 
-	require.NoError(t, ensureAutoTLSCertificates(t.Context(), ec, cli))
+	require.NoError(t, ensureClusterTLS(t.Context(), ec, cli))
 
 	cfg, err := buildClientTLSConfig(t.Context(), ec, cli)
 	require.NoError(t, err)
