@@ -1,0 +1,111 @@
+internal/controller/pods_test.go
+  s_b50123ab183862::t_895f79a4a34a1d 615-616,628-629,651-652,668-669,692-693,708-709,723-724,740-741,773-778,816-818,826-828
+  s_8a70943cfff0c5::t_5642de621fd884 866,903,941,959
+  s_8a70943cfff0c5::t_dcf8ee9f6525a5 169
+  s_8a70943cfff0c5::t_e909260fefb473 200,232
+  s_8a70943cfff0c5::t_4cde9b62d7396c 756,783,841
+internal/controller/pods.go
+  s_b50123ab183862::t_f99a70d4438847 147,153-159,174,192
+  s_8a70943cfff0c5::t_5c99b4c63a3a19 352
+  s_8a70943cfff0c5::t_bfb1d6b316f59f 498
+  s_8a70943cfff0c5::t_6985042a7cc0a4 148-152,160-170,176-177
+  s_8a70943cfff0c5::t_729fa1aa2d14c0 178,184,190-191,193
+  s_8a70943cfff0c5::t_52a8ec18a3adf1 376
+  s_8a70943cfff0c5::t_b48ed9f9e17b37 299,306-307
+  s_8a70943cfff0c5::t_67cd9b4884bc88 220,225
+internal/controller/utils_test.go
+  s_b50123ab183862::t_2c72c4f78a387e 379-380,395,400,405,420
+  s_b50123ab183862::t_64de0431db70d7 241,246-247
+  s_8a70943cfff0c5::t_e909260fefb473 373-374,443
+  s_8a70943cfff0c5::t_7dfcc62938c45b 257,338
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_b50123ab183862::t_a127364eb8afce 1110-1112,1159-1161
+  s_8a70943cfff0c5::t_b6ac3624d94545 1292-1301
+pkg/certificate/cert_manager/provider.go
+  s_b50123ab183862::t_67d78ee9e9e7dd 311
+internal/controller/etcdcluster_controller.go
+  s_b50123ab183862::t_14527fd28c0010 67-68,72
+  s_8a70943cfff0c5::t_e33ef4b3ede85a 385
+  s_8a70943cfff0c5::t_dd30187c42d9eb 212-214
+  s_8a70943cfff0c5::t_b106385e28af27 69-71
+  s_8a70943cfff0c5::t_49c378981f654f 28
+  s_8a70943cfff0c5::t_1e393f0f9baa0a 397
+  s_8a70943cfff0c5::t_4b02becf890566 633
+  s_8a70943cfff0c5::t_219ac5481f49f1 242-261
+  s_8a70943cfff0c5::t_a8875d8b1a0ac6 428
+pkg/certificate/auto/provider.go
+  s_b50123ab183862::t_67d78ee9e9e7dd 245
+internal/controller/utils.go
+  s_b50123ab183862::t_c661d0d7fa2dcf 285-286
+  s_b50123ab183862::t_3def3b65e652c7 218
+  s_b50123ab183862::t_af1934147fdf73 309,329-330
+  s_8a70943cfff0c5::t_1a2143cbe831c4 283
+  s_8a70943cfff0c5::t_a9c2ad5bbdc9eb 214-216,219
+  s_8a70943cfff0c5::t_47e6f956f6bd3d 377
+  s_8a70943cfff0c5::t_5c022a6ba9cc35 265
+  s_8a70943cfff0c5::t_ad0be1c8298615 395,397,403,405,411,413,419,421,424
+  s_8a70943cfff0c5::t_2f21519f36f698 354
+  s_8a70943cfff0c5::t_73e052aab0433e 368
+  s_8a70943cfff0c5::t_745341f242ee88 327
+  s_8a70943cfff0c5::t_4bb7d20fdae1d4 303,306
+  s_8a70943cfff0c5::t_d39ecbb20df7d0 151-155,159
+cmd/main.go
+  s_b50123ab183862::t_659b7a8835ce3a 79-83
+  s_b50123ab183862::t_f7253b239c9ffa 65
+  s_b50123ab183862::t_2ef6ce53241d3a 158-161
+internal/controller/etcdcluster_test.go
+  s_b50123ab183862::t_c6b272fd63c932 230-234
+  s_8a70943cfff0c5::t_e909260fefb473 208-209,235
+internal/controller/etcdcluster.go
+  s_b50123ab183862::t_38d10790a18160 60
+  s_8a70943cfff0c5::t_2ad82e569bec3c 44-47,54,61-62
+  s_8a70943cfff0c5::t_a4d6549e7c6293 63
+api/v1alpha1/etcdcluster_types.go
+  s_b50123ab183862::t_3598854d05a323 101-103
+  s_8a70943cfff0c5::t_b4c15783789ab1 225-234
+internal/controller/etcdmember_test.go
+  s_8a70943cfff0c5::t_e909260fefb473 435,666
+  s_8a70943cfff0c5::t_0fce3efc711f5f 439,450
+internal/controller/etcdmember.go
+  s_8a70943cfff0c5::t_6f76b15932c23c 175,181,210,229,289,512,565,619,653,713,775,777,780,944,947
+  s_8a70943cfff0c5::t_7c8a3014589266 220,239,304,582,648,672,734
+internal/controller/quorum_recovery_test.go
+  s_8a70943cfff0c5::t_06e6bea5801dd3 424
+  s_8a70943cfff0c5::t_e909260fefb473 77
+test/e2e/helpers_test.go
+  s_8a70943cfff0c5::t_a5afa503b6e306 139
+test/e2e/e2e_test.go
+  s_8a70943cfff0c5::t_a5afa503b6e306 949
+internal/controller/quorum_recovery.go
+  s_8a70943cfff0c5::t_04dd70ba3692cf 199
+internal/controller/etcdcluster_controller_test.go
+  s_8a70943cfff0c5::t_54247df9307e1f 23
+  s_8a70943cfff0c5::t_e909260fefb473 702,737-739,1091,1099
+  s_8a70943cfff0c5::t_3436cf4ba69e39 1611-1657
+internal/controller/nospace.go
+  s_8a70943cfff0c5::t_7c8a3014589266 109,137,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7284d4432e64c1ad65c2f5735b3e9793c9345d7e",
+  "prompts": {},
+  "sessions": {
+    "s_8a70943cfff0c5": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "d47856b3-e624-4c2d-b103-39e4d7d5189a",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    },
+    "s_b50123ab183862": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "83eb7408-6c4c-434b-b649-f42033e9eedf",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
