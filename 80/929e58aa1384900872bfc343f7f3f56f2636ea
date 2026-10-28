@@ -1,0 +1,100 @@
+internal/controller/etcdmember.go
+  s_b50123ab183862::t_e981be10d3b674 675
+  s_b50123ab183862::t_9212f510e8ab09 565
+  s_b50123ab183862::t_ac0bbdf2191bad 181
+  s_b50123ab183862::t_a284f4a0d71bde 582
+  s_b50123ab183862::t_9ad876ce0bddd5 648,653
+  s_b50123ab183862::t_34b966fd7cbd78 951,954
+  s_b50123ab183862::t_e68ecd459b9b1a 175
+  s_b50123ab183862::t_b004a3251f02e1 741
+  s_b50123ab183862::t_5f2abf02f640d6 512
+  s_b50123ab183862::t_2dbfdbe20a2d30 289
+  s_b50123ab183862::t_66644eb07b58ab 782,784,787
+  s_b50123ab183862::t_8f3d145c736ffc 210,220
+  s_b50123ab183862::t_1fcc5c821088f6 719-720
+  s_b50123ab183862::t_e9443c90ada423 619
+  s_b50123ab183862::t_ab3f80ad63827c 229,239
+  s_b50123ab183862::t_3abc743a58e22d 304
+internal/controller/etcdcluster_controller_test.go
+  s_b50123ab183862::t_2c72c4f78a387e 701,736-738,1090,1098
+internal/controller/pods_test.go
+  s_b50123ab183862::t_7739b4b051e258 162
+  s_b50123ab183862::t_895f79a4a34a1d 620-621,633-634,656-657,673-674,697-698,713-714,728-729,745-746,778-783,821-823,831-833
+  s_b50123ab183862::t_7dd70214fe72d0 170,201,234,245,470,586,761,788,846,871,908,946,964
+  s_b50123ab183862::t_7d15b44456a448 210
+internal/controller/pods.go
+  s_b50123ab183862::t_bae678708714ec 364
+  s_b50123ab183862::t_375b33056e9dc8 482,487
+  s_b50123ab183862::t_f99a70d4438847 147-156,160,162-164,170,177-179
+  s_b50123ab183862::t_cba4ec233f54d2 206,211
+  s_b50123ab183862::t_12b9510cf58ffe 285,287,293-294
+  s_b50123ab183862::t_5f26ca2a729f94 322
+  s_b50123ab183862::t_209b0f0d7c56d7 340
+internal/controller/nospace.go
+  s_b50123ab183862::t_bc1e8ba3a15c8a 137
+  s_b50123ab183862::t_9b7e5a1de29afd 109
+  s_b50123ab183862::t_ef4f2241994090 159
+test/e2e/helpers_test.go
+  s_b50123ab183862::t_ff4ae3968a6a96 139
+internal/controller/utils_test.go
+  s_b50123ab183862::t_2c72c4f78a387e 373-374,379-380,395,400,405,420,443
+  s_b50123ab183862::t_7d15b44456a448 257,338
+  s_b50123ab183862::t_64de0431db70d7 241,246-247
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_b50123ab183862::t_a127364eb8afce 1110-1112,1159-1161
+pkg/certificate/cert_manager/provider.go
+  s_b50123ab183862::t_67d78ee9e9e7dd 311
+internal/controller/etcdcluster_controller.go
+  s_b50123ab183862::t_ecae2c0ec540e9 607
+  s_b50123ab183862::t_ee878d472f840a 371
+  s_b50123ab183862::t_14527fd28c0010 66-69
+  s_b50123ab183862::t_a3d30180f5893f 359
+  s_b50123ab183862::t_6bc7fe24f0d555 402
+pkg/certificate/auto/provider.go
+  s_b50123ab183862::t_67d78ee9e9e7dd 245
+internal/controller/utils.go
+  s_b50123ab183862::t_c661d0d7fa2dcf 265,283,285-286
+  s_b50123ab183862::t_67ccf6afe58968 377
+  s_b50123ab183862::t_3def3b65e652c7 214-216,218-219
+  s_b50123ab183862::t_3abdc7d51c1062 354
+  s_b50123ab183862::t_af1934147fdf73 303,306,309,327,329-330
+  s_b50123ab183862::t_0e6da563daa335 395,397,403,405,411,413,419,421,424
+  s_b50123ab183862::t_6f8038cb04a553 151-152
+  s_b50123ab183862::t_c5ff8bb6e72a7b 368
+internal/controller/etcdmember_test.go
+  s_b50123ab183862::t_2c72c4f78a387e 435,439,450,666
+cmd/main.go
+  s_b50123ab183862::t_659b7a8835ce3a 79-83
+  s_b50123ab183862::t_f7253b239c9ffa 65
+  s_b50123ab183862::t_2ef6ce53241d3a 158-161
+internal/controller/etcdcluster_test.go
+  s_b50123ab183862::t_7d15b44456a448 235
+  s_b50123ab183862::t_c6b272fd63c932 230-234
+  s_b50123ab183862::t_2c72c4f78a387e 208-209
+internal/controller/quorum_recovery_test.go
+  s_b50123ab183862::t_2c72c4f78a387e 77,424
+test/e2e/e2e_test.go
+  s_b50123ab183862::t_9e4359bb2ba194 949
+internal/controller/etcdcluster.go
+  s_b50123ab183862::t_38d10790a18160 50,56-59
+internal/controller/quorum_recovery.go
+  s_b50123ab183862::t_ad38cc90621bcc 199
+api/v1alpha1/etcdcluster_types.go
+  s_b50123ab183862::t_3598854d05a323 101-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80929e58aa1384900872bfc343f7f3f56f2636ea",
+  "prompts": {},
+  "sessions": {
+    "s_b50123ab183862": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "83eb7408-6c4c-434b-b649-f42033e9eedf",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
