@@ -1,0 +1,87 @@
+internal/controller/nospace.go
+  s_8a70943cfff0c5::t_5642de621fd884 109,137,159
+internal/controller/etcdcluster_controller.go
+  s_8a70943cfff0c5::t_e33ef4b3ede85a 385
+  s_8a70943cfff0c5::t_dd30187c42d9eb 212-214
+  s_8a70943cfff0c5::t_b106385e28af27 69-71
+  s_8a70943cfff0c5::t_2c2f88314680e7 428
+  s_8a70943cfff0c5::t_49c378981f654f 28
+  s_8a70943cfff0c5::t_1e393f0f9baa0a 397
+  s_8a70943cfff0c5::t_4b02becf890566 633
+  s_8a70943cfff0c5::t_219ac5481f49f1 242-261
+internal/controller/etcdmember_test.go
+  s_8a70943cfff0c5::t_e909260fefb473 435,666
+  s_8a70943cfff0c5::t_0fce3efc711f5f 439,450
+internal/controller/etcdcluster.go
+  s_8a70943cfff0c5::t_2ad82e569bec3c 44-47,54,61-63
+internal/controller/etcdmember.go
+  s_8a70943cfff0c5::t_7a6276b9e6ec1e 304
+  s_8a70943cfff0c5::t_6f76b15932c23c 175,181,210,229,289,512,565,619,653,713,775,777,780,944,947
+  s_8a70943cfff0c5::t_5642de621fd884 220,239,582,648,672,734
+api/v1alpha1/etcdcluster_types.go
+  s_8a70943cfff0c5::t_b4c15783789ab1 225-234
+internal/controller/quorum_recovery_test.go
+  s_8a70943cfff0c5::t_06e6bea5801dd3 424
+  s_8a70943cfff0c5::t_e909260fefb473 77
+internal/controller/pods.go
+  s_8a70943cfff0c5::t_5c99b4c63a3a19 355
+  s_8a70943cfff0c5::t_5cffb090772b15 379
+  s_8a70943cfff0c5::t_6a566cf89ec8b2 221
+  s_8a70943cfff0c5::t_bfb1d6b316f59f 501
+  s_8a70943cfff0c5::t_b3778ffc38e94e 226
+  s_8a70943cfff0c5::t_57f6c140d14cc9 300-301,303,309-310
+  s_8a70943cfff0c5::t_6985042a7cc0a4 148-152,160-170,176-177
+  s_8a70943cfff0c5::t_5bc155178e6359 178,184,190-192,194
+internal/controller/etcdcluster_test.go
+  s_8a70943cfff0c5::t_e909260fefb473 208-209,235
+internal/controller/pods_test.go
+  s_8a70943cfff0c5::t_5642de621fd884 892,929,967,985
+  s_8a70943cfff0c5::t_dd619677fd2982 282-307
+  s_8a70943cfff0c5::t_dcf8ee9f6525a5 169
+  s_8a70943cfff0c5::t_e909260fefb473 200,232
+  s_8a70943cfff0c5::t_d1ca5fa35ffd03 782,809,867
+internal/controller/utils.go
+  s_8a70943cfff0c5::t_1a2143cbe831c4 283
+  s_8a70943cfff0c5::t_a9c2ad5bbdc9eb 214-216,219
+  s_8a70943cfff0c5::t_47e6f956f6bd3d 377
+  s_8a70943cfff0c5::t_e52c268e9dceb7 153-155
+  s_8a70943cfff0c5::t_5c022a6ba9cc35 265
+  s_8a70943cfff0c5::t_ad0be1c8298615 395,397,403,405,411,413,419,421,424
+  s_8a70943cfff0c5::t_cec99b22ed32a6 151-152
+  s_8a70943cfff0c5::t_2f21519f36f698 354
+  s_8a70943cfff0c5::t_99ff3e0ca94098 159
+  s_8a70943cfff0c5::t_73e052aab0433e 368
+  s_8a70943cfff0c5::t_745341f242ee88 327
+  s_8a70943cfff0c5::t_4bb7d20fdae1d4 303,306
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_8a70943cfff0c5::t_b6ac3624d94545 1292-1301
+internal/controller/utils_test.go
+  s_8a70943cfff0c5::t_e909260fefb473 373-374,443
+  s_8a70943cfff0c5::t_7dfcc62938c45b 257,338
+test/e2e/helpers_test.go
+  s_8a70943cfff0c5::t_a5afa503b6e306 139
+test/e2e/e2e_test.go
+  s_8a70943cfff0c5::t_a5afa503b6e306 949
+internal/controller/quorum_recovery.go
+  s_8a70943cfff0c5::t_04dd70ba3692cf 199
+internal/controller/etcdcluster_controller_test.go
+  s_8a70943cfff0c5::t_54247df9307e1f 23
+  s_8a70943cfff0c5::t_e909260fefb473 702,737-739,1091,1099
+  s_8a70943cfff0c5::t_3436cf4ba69e39 1611-1657
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0adaea37f9e88afa2b14716c49df549c21b1b65c",
+  "prompts": {},
+  "sessions": {
+    "s_8a70943cfff0c5": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "d47856b3-e624-4c2d-b103-39e4d7d5189a",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
