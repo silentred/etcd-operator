@@ -395,7 +395,7 @@ func (r *EtcdClusterReconciler) refreshClusterState(ctx context.Context, s *reco
 	logger.Info("Now checking health of the cluster members")
 
 	var err error
-	s.memberListResp, s.health, err = healthCheck(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster), s.tlsConfig, logger)
+	s.memberListResp, s.health, err = healthCheck(s.cluster, s.pods, s.tlsConfig, logger)
 	if err != nil {
 		logger.Info("health check found errors", "errors", err)
 	}

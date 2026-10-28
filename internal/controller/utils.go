@@ -148,15 +148,15 @@ func getArgName(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func createArgs(name string, etcdOptions []string, tlsEnabled bool) []string {
-	defaultArgs := defaultArgs(name, tlsEnabled)
-	if len(etcdOptions) > 0 {
-		for i := range etcdOptions {
-			argName := getArgName(etcdOptions[i])
+func createArgs(ec *ecv1alpha1.EtcdCluster) []string {
+	defaultArgs := defaultArgs(ec)
+	if len(ec.Spec.EtcdOptions) > 0 {
+		for i := range ec.Spec.EtcdOptions {
+			argName := getArgName(ec.Spec.EtcdOptions[i])
 			defaultArgs = RemoveStringFromSlice(defaultArgs, argName)
 		}
 	}
-	defaultArgs = append(defaultArgs, etcdOptions...)
+	defaultArgs = append(defaultArgs, ec.Spec.EtcdOptions...)
 	return defaultArgs
 }
 

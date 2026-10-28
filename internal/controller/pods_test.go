@@ -279,6 +279,32 @@ func envVarsToMap(pod *corev1.Pod) map[string]string {
 	return m
 }
 
+// argTestCluster builds a cluster fixture for the createArgs/defaultArgs
+// tables: the TLS spec is present exactly when the table's tlsEnabled case
+// is true.
+func argTestCluster(clusterName string, etcdOptions []string, tlsEnabled bool) *ecv1alpha1.EtcdCluster {
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+		Spec:       ecv1alpha1.EtcdClusterSpec{EtcdOptions: etcdOptions},
+	}
+	if tlsEnabled {
+		ec.Spec.TLS = &ecv1alpha1.TLSCertificate{}
+	}
+	return ec
+}
+
+// endpointTestCluster builds a cluster fixture for the endpoint tests. The
+// namespace is the tests' expected "default".
+func endpointTestCluster(clusterName string, tlsEnabled bool) *ecv1alpha1.EtcdCluster {
+	ec := &ecv1alpha1.EtcdCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: "default"},
+	}
+	if tlsEnabled {
+		ec.Spec.TLS = &ecv1alpha1.TLSCertificate{}
+	}
+	return ec
+}
+
 // ---------------------------------------------------------------------------
 // waitForPodReady
 // ---------------------------------------------------------------------------
@@ -753,7 +779,7 @@ func TestCreatingArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			result := createArgs(tt.clusterName, tt.etcdOptions, tt.tlsEnabled)
+			result := createArgs(argTestCluster(tt.clusterName, tt.etcdOptions, tt.tlsEnabled))
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
@@ -780,7 +806,7 @@ func TestClientEndpointForOrdinal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := clientEndpointForOrdinal("test-cluster", "default", tt.ordinal, tt.tlsEnabled)
+			result := clientEndpointForOrdinal(endpointTestCluster("test-cluster", tt.tlsEnabled), tt.ordinal)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -838,7 +864,7 @@ func TestClientEndpointsFromPods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := clientEndpointsFromPods("test-sts", "default", tt.pods, tt.tlsEnabled)
+			result := clientEndpointsFromPods(endpointTestCluster("test-sts", tt.tlsEnabled), tt.pods)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

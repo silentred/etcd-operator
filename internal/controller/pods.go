@@ -150,22 +150,23 @@ func waitForPodReady(ctx context.Context, logger logr.Logger, c client.Client, p
 //	{scheme}://{podName}.{clusterName}.{namespace}.svc.cluster.local:2379
 //
 // where scheme reflects the cluster's TLS configuration.
-func clientEndpointsFromPods(clusterName, namespace string, pods []*corev1.Pod, tlsEnabled bool) []string {
+func clientEndpointsFromPods(ec *ecv1alpha1.EtcdCluster, pods []*corev1.Pod) []string {
 	if len(pods) == 0 {
 		return nil
 	}
 	eps := make([]string, 0, len(pods))
 	for _, pod := range pods {
-		eps = append(eps, clientEndpointForOrdinal(clusterName, namespace, podOrdinal(pod.Name, clusterName), tlsEnabled))
+		eps = append(eps, clientEndpointForOrdinal(ec, podOrdinal(pod.Name, ec.Name)))
 	}
 	return eps
 }
 
 // clientEndpointForOrdinal returns the client endpoint URL for a member at the
-// given ordinal index. The URL scheme is https when tlsEnabled is true, otherwise http.
-func clientEndpointForOrdinal(clusterName, namespace string, ordinal int, tlsEnabled bool) string {
+// given ordinal index. The URL scheme is https when the cluster has TLS
+// configured, otherwise http.
+func clientEndpointForOrdinal(ec *ecv1alpha1.EtcdCluster, ordinal int) string {
 	return fmt.Sprintf("%s://%s-%d.%s.%s.svc.cluster.local:2379",
-		clusterScheme(tlsEnabled), clusterName, ordinal, clusterName, namespace)
+		clusterScheme(clusterTLSEnabled(ec)), ec.Name, ordinal, ec.Name, ec.Namespace)
 }
 
 // clusterScheme returns the URL scheme to use for cluster endpoints: "https"
@@ -192,12 +193,12 @@ func clusterTLSEnabled(ec *ecv1alpha1.EtcdCluster) bool {
 // range request against each member (etcdutils.MemberHealth), so an
 // individual member can be reported healthy even while the cluster as a
 // whole lacks quorum.
-func healthCheck(clusterName, namespace string, pods []*corev1.Pod, tlsEnabled bool, tlsConfig *tls.Config, lg klog.Logger) (*clientv3.MemberListResponse, *etcdutils.ClusterHealth, error) {
+func healthCheck(ec *ecv1alpha1.EtcdCluster, pods []*corev1.Pod, tlsConfig *tls.Config, lg klog.Logger) (*clientv3.MemberListResponse, *etcdutils.ClusterHealth, error) {
 	if len(pods) == 0 {
 		return nil, nil, nil
 	}
 
-	endpoints := clientEndpointsFromPods(clusterName, namespace, pods, tlsEnabled)
+	endpoints := clientEndpointsFromPods(ec, pods)
 
 	memberlistResp, listErr := etcdutils.MemberList(etcdutils.ClientConfig{Endpoints: endpoints, TLS: tlsConfig})
 	alarmResp, alarmErr := etcdutils.AlarmList(etcdutils.ClientConfig{Endpoints: endpoints, TLS: tlsConfig})
@@ -271,15 +272,16 @@ const (
 	peerTrustedCAFile = peerCertMountDir + "/ca.crt"
 )
 
-func defaultArgs(name string, tlsEnabled bool) []string {
+func defaultArgs(ec *ecv1alpha1.EtcdCluster) []string {
+	tlsEnabled := clusterTLSEnabled(ec)
 	scheme := clusterScheme(tlsEnabled)
 	args := make([]string, 0, 13)
 	args = append(args,
 		"--name=$(POD_NAME)",
 		fmt.Sprintf("--listen-peer-urls=%s://0.0.0.0:2380", scheme),
 		fmt.Sprintf("--listen-client-urls=%s://0.0.0.0:2379", scheme),
-		fmt.Sprintf("--initial-advertise-peer-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2380", scheme, name),
-		fmt.Sprintf("--advertise-client-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2379", scheme, name),
+		fmt.Sprintf("--initial-advertise-peer-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2380", scheme, ec.Name),
+		fmt.Sprintf("--advertise-client-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2379", scheme, ec.Name),
 	)
 	if !tlsEnabled {
 		return args
@@ -348,7 +350,7 @@ func buildMemberPod(
 		Name:    "etcd",
 		Image:   fmt.Sprintf("%s:%s", ec.Spec.ImageRegistry, member.Spec.Version),
 		Command: []string{"/usr/local/bin/etcd"},
-		Args:    createArgs(ec.Name, ec.Spec.EtcdOptions, clusterTLSEnabled(ec)),
+		Args:    createArgs(ec),
 		Env:     envVars,
 		Ports: []corev1.ContainerPort{
 			{Name: "client", ContainerPort: 2379},

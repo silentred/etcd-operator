@@ -217,7 +217,7 @@ func removeEtcdNode(s *reconcileState, member *ecv1alpha1.EtcdMember) error {
 		return nil // already removed from the membership
 	}
 
-	endpoints := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster))
+	endpoints := clientEndpointsFromPods(s.cluster, s.pods)
 	cfg := etcdutils.ClientConfig{Endpoints: endpoints, TLS: s.tlsConfig}
 	if err := etcdutils.RemoveMember(cfg, etcdNode.ID); err != nil {
 		return fmt.Errorf("failed to remove the etcd node for EtcdMember %q: %w", member.Name, err)
@@ -236,7 +236,7 @@ func disarmForEtcdMember(s *reconcileState, member *ecv1alpha1.EtcdMember) error
 		}
 	}
 	if len(alarms) > 0 {
-		endpoints := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, s.pods, clusterTLSEnabled(s.cluster))
+		endpoints := clientEndpointsFromPods(s.cluster, s.pods)
 		cfg := etcdutils.ClientConfig{Endpoints: endpoints, TLS: s.tlsConfig}
 		if err := etcdutils.AlarmDisarm(cfg, alarms); err != nil {
 			return fmt.Errorf("failed to disarm alarms for EtcdMember %q: %w", member.Name, err)
@@ -301,7 +301,7 @@ func (r *EtcdClusterReconciler) handleCorruptAlarm(ctx context.Context, s *recon
 	logger.Info("Disarming the CORRUPT alarm")
 	// The removed member has stopped, so its endpoint can't serve any requests.
 	pods := slices.DeleteFunc(slices.Clone(s.pods), func(p *corev1.Pod) bool { return member != nil && p.Name == member.Name })
-	endpoints := clientEndpointsFromPods(s.cluster.Name, s.cluster.Namespace, pods, clusterTLSEnabled(s.cluster))
+	endpoints := clientEndpointsFromPods(s.cluster, pods)
 	cfg := etcdutils.ClientConfig{Endpoints: endpoints, TLS: s.tlsConfig}
 	if err := etcdutils.AlarmDisarm(cfg, []*etcdserverpb.AlarmMember{alarm}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to disarm the CORRUPT alarm of etcd member %x: %w", alarm.MemberID, err)
@@ -579,7 +579,7 @@ func (r *EtcdClusterReconciler) reconcileRecreating(
 // operation: if no healthy target is found, or there are no live client
 // endpoints, it is a no-op.
 func (r *EtcdClusterReconciler) transferLeader(ctx context.Context, state *reconcileState, member *ecv1alpha1.EtcdMember) error {
-	endpoints := clientEndpointsFromPods(state.cluster.Name, state.cluster.Namespace, state.pods, clusterTLSEnabled(state.cluster))
+	endpoints := clientEndpointsFromPods(state.cluster, state.pods)
 	if len(endpoints) == 0 {
 		return nil
 	}
@@ -645,7 +645,7 @@ func (r *EtcdClusterReconciler) provisionPVC(ctx context.Context, state *reconci
 // The member's Pod is created in a later pass that renders
 // ETCD_INITIAL_CLUSTER from a fresh membership snapshot.
 func (r *EtcdClusterReconciler) addLearner(ctx context.Context, state *reconcileState, member *ecv1alpha1.EtcdMember) error {
-	endpoints := clientEndpointsFromPods(state.cluster.Name, state.cluster.Namespace, state.pods, clusterTLSEnabled(state.cluster))
+	endpoints := clientEndpointsFromPods(state.cluster, state.pods)
 	if len(endpoints) == 0 {
 		return fmt.Errorf("cannot add learner for EtcdMember %q: no live client endpoints", member.Name)
 	}
@@ -669,12 +669,7 @@ func (r *EtcdClusterReconciler) promoteLearnerForEtcdMember(
 	member *ecv1alpha1.EtcdMember,
 	etcdNode *etcdserverpb.Member,
 ) (ctrl.Result, error) {
-	endpoints := clientEndpointsFromPods(
-		state.cluster.Name,
-		state.cluster.Namespace,
-		state.pods,
-		clusterTLSEnabled(state.cluster),
-	)
+	endpoints := clientEndpointsFromPods(state.cluster, state.pods)
 	if len(endpoints) == 0 {
 		return ctrl.Result{}, fmt.Errorf("promoting learner for EtcdMember %q: no live client endpoints", member.Name)
 	}
@@ -736,7 +731,7 @@ func (r *EtcdClusterReconciler) createPodForEtcdMember(
 func (r *EtcdClusterReconciler) refreshMemberStatus(ctx context.Context, s *reconcileState, member *ecv1alpha1.EtcdMember) error {
 	logger := log.FromContext(ctx)
 
-	endpoint := clientEndpointForOrdinal(s.cluster.Name, s.cluster.Namespace, member.Spec.Ordinal, clusterTLSEnabled(s.cluster))
+	endpoint := clientEndpointForOrdinal(s.cluster, member.Spec.Ordinal)
 	probes, err := etcdutils.MemberHealth(etcdutils.ClientConfig{
 		Endpoints: []string{endpoint},
 		Names:     []string{member.Name},
