@@ -1,0 +1,74 @@
+test/e2e/e2e_test.go
+  s_4c36f978ffc3af::t_798d6b0d67daee 949
+internal/controller/etcdcluster_controller.go
+  s_4c36f978ffc3af::t_4f307879793c44 608
+  s_4c36f978ffc3af::t_1b336bf9bc6157 80
+  s_4c36f978ffc3af::t_f85c6af8ef9363 66-69,360,372
+  s_4c36f978ffc3af::t_dda83568ba01e4 223
+  s_4c36f978ffc3af::t_3a84c540328e38 403
+internal/controller/etcdcluster.go
+  s_4c36f978ffc3af::t_a1ec07554047c7 50,58
+internal/controller/pods_test.go
+  s_4c36f978ffc3af::t_75f899b5bbdac1 160,165,170
+  s_4c36f978ffc3af::t_f9f90596a81d67 201,208
+  s_4c36f978ffc3af::t_f85c6af8ef9363 620-621,633-634,656-657,673-674,697-698,713-714,728-729,745-746,761,776,779-788,793,826-828,836-838,851,983-988,993-1023,1027-1031
+  s_4c36f978ffc3af::t_82877bf59db92e 468,584
+  s_4c36f978ffc3af::t_d729bbb73a4c57 876,913
+  s_4c36f978ffc3af::t_810aa80ad0fa4b 1032
+  s_4c36f978ffc3af::t_5bc9a6a1898c15 234,243
+  s_4c36f978ffc3af::t_a9ea751be252f5 951,969,982,989-992,1024-1026
+internal/controller/quorum_recovery.go
+  s_4c36f978ffc3af::t_297e1bf9ee90e6 199
+cmd/main.go
+  s_4c36f978ffc3af::t_f85c6af8ef9363 65,79-83,158-161
+internal/controller/utils_test.go
+  s_4c36f978ffc3af::t_f85c6af8ef9363 24-46,264,269-270,280,361,379-483,495-551
+  s_4c36f978ffc3af::t_3cc971b0127424 614
+internal/controller/pods.go
+  s_4c36f978ffc3af::t_f85c6af8ef9363 147-157,161,163-165,171,178-180,212,286,288,294-295,341,365
+  s_4c36f978ffc3af::t_d77c92edceb18c 321
+  s_4c36f978ffc3af::t_7b15cc2fbe6f28 207
+  s_4c36f978ffc3af::t_3a8a741ac5c153 481,488
+internal/controller/etcdmember_test.go
+  s_4c36f978ffc3af::t_3cc971b0127424 435,666
+internal/controller/etcdmember.go
+  s_4c36f978ffc3af::t_e8a13d7bac711e 220,239,512,582,619,648,653,741,784,954
+  s_4c36f978ffc3af::t_6b16828e8ed29e 951
+  s_4c36f978ffc3af::t_22ba3e02257396 675
+  s_4c36f978ffc3af::t_246aedd0cd4e49 718
+  s_4c36f978ffc3af::t_f138472263d7ab 787
+  s_4c36f978ffc3af::t_f17716968bf7e7 304,565
+internal/controller/etcdcluster_controller_test.go
+  s_4c36f978ffc3af::t_3cc971b0127424 701,736-738,1090,1098
+  s_4c36f978ffc3af::t_2994a93f96ec6d 1610-1660
+internal/controller/nospace.go
+  s_4c36f978ffc3af::t_e8a13d7bac711e 109,159
+  s_4c36f978ffc3af::t_f17716968bf7e7 137
+internal/controller/quorum_recovery_test.go
+  s_4c36f978ffc3af::t_3cc971b0127424 77
+internal/controller/utils.go
+  s_4c36f978ffc3af::t_f85c6af8ef9363 151-152,214-216,218-219,265,283,285-286,303,306,309,327,329-330,354,368,377,395,397,403,405,411,413,419,421,424
+internal/controller/etcdcluster_test.go
+  s_4c36f978ffc3af::t_6f012c7d149b42 208
+  s_4c36f978ffc3af::t_f85c6af8ef9363 209
+  s_4c36f978ffc3af::t_d71858f6c24d37 234
+  s_4c36f978ffc3af::t_74724bf5d2f127 230-233
+test/e2e/helpers_test.go
+  s_4c36f978ffc3af::t_798d6b0d67daee 139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ad89ca74af6eb62b53eb1a5fdbf5487c0172bb88",
+  "prompts": {},
+  "sessions": {
+    "s_4c36f978ffc3af": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "1268841a-75d1-4a28-a565-f421c52f5a76",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
