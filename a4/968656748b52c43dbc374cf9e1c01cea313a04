@@ -1,0 +1,31 @@
+internal/controller/etcdcluster_controller.go
+  s_8a70943cfff0c5::t_946ddef6c51738 398
+internal/controller/etcdmember.go
+  s_8a70943cfff0c5::t_62621d972c7b37 220,239,304,582,648,672,734
+internal/controller/pods.go
+  s_8a70943cfff0c5::t_946ddef6c51738 153,159,165-167,169,196,201,275-276,283-284,353
+internal/controller/pods_test.go
+  s_8a70943cfff0c5::t_ad61e289c8cded 282-307,782,809,867
+internal/controller/etcdcluster.go
+  s_8a70943cfff0c5::t_946ddef6c51738 58
+internal/controller/utils.go
+  s_8a70943cfff0c5::t_946ddef6c51738 151-155,159
+internal/controller/nospace.go
+  s_8a70943cfff0c5::t_62621d972c7b37 109,137,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a4968656748b52c43dbc374cf9e1c01cea313a04",
+  "prompts": {},
+  "sessions": {
+    "s_8a70943cfff0c5": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "d47856b3-e624-4c2d-b103-39e4d7d5189a",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
