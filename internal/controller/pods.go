@@ -144,12 +144,37 @@ func waitForPodReady(ctx context.Context, logger logr.Logger, c client.Client, p
 	return nil
 }
 
+// memberDNSSuffix returns the trailing segment appended to "<pod>.<sts>.<ns>."
+// when building an etcd member FQDN, derived from the raw --service-dns-domain
+// flag value. When dnsDomain is empty the suffix is the short form "svc";
+// otherwise it is "svc.<dnsDomain>". This is only the flag-to-suffix mapping;
+// the cluster's effective suffix lives in EtcdCluster.Status.DomainSuffix
+// (read it via clusterDNSSuffix, not here).
+func memberDNSSuffix(dnsDomain string) string {
+	if dnsDomain == "" {
+		return "svc"
+	}
+	return "svc." + dnsDomain
+}
+
+// clusterDNSSuffix returns the cluster's effective member DNS suffix, as
+// pinned into Status.DomainSuffix by pinDomainSuffix on the first reconcile.
+// Clusters not yet reconciled by a version with the pin (empty status) fall
+// back to the short form "svc", matching the operator's empty-flag default.
+func clusterDNSSuffix(ec *ecv1alpha1.EtcdCluster) string {
+	if ec.Status.DomainSuffix == "" {
+		return memberDNSSuffix("")
+	}
+	return ec.Status.DomainSuffix
+}
+
 // clientEndpointsFromPods builds the client endpoint URL for every pod in the
 // slice, in the same order.  The DNS form is:
 //
-//	{scheme}://{podName}.{clusterName}.{namespace}.svc.cluster.local:2379
+//	{scheme}://{podName}.{clusterName}.{namespace}.{dnsSuffix}:2379
 //
-// where scheme reflects the cluster's TLS configuration.
+// where scheme reflects the cluster's TLS configuration and dnsSuffix is the
+// cluster's pinned Status.DomainSuffix (see clusterDNSSuffix).
 func clientEndpointsFromPods(ec *ecv1alpha1.EtcdCluster, pods []*corev1.Pod) []string {
 	if len(pods) == 0 {
 		return nil
@@ -165,8 +190,8 @@ func clientEndpointsFromPods(ec *ecv1alpha1.EtcdCluster, pods []*corev1.Pod) []s
 // given ordinal index. The URL scheme is https when the cluster has TLS
 // configured, otherwise http.
 func clientEndpointForOrdinal(ec *ecv1alpha1.EtcdCluster, ordinal int) string {
-	return fmt.Sprintf("%s://%s-%d.%s.%s.svc.cluster.local:2379",
-		clusterScheme(clusterTLSEnabled(ec)), ec.Name, ordinal, ec.Name, ec.Namespace)
+	return fmt.Sprintf("%s://%s-%d.%s.%s.%s:2379",
+		clusterScheme(clusterTLSEnabled(ec)), ec.Name, ordinal, ec.Name, ec.Namespace, clusterDNSSuffix(ec))
 }
 
 // clusterScheme returns the URL scheme to use for cluster endpoints: "https"
@@ -275,13 +300,14 @@ const (
 func defaultArgs(ec *ecv1alpha1.EtcdCluster) []string {
 	tlsEnabled := clusterTLSEnabled(ec)
 	scheme := clusterScheme(tlsEnabled)
+	suffix := clusterDNSSuffix(ec)
 	args := make([]string, 0, 13)
 	args = append(args,
 		"--name=$(POD_NAME)",
 		fmt.Sprintf("--listen-peer-urls=%s://0.0.0.0:2380", scheme),
 		fmt.Sprintf("--listen-client-urls=%s://0.0.0.0:2379", scheme),
-		fmt.Sprintf("--initial-advertise-peer-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2380", scheme, ec.Name),
-		fmt.Sprintf("--advertise-client-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).svc.cluster.local:2379", scheme, ec.Name),
+		fmt.Sprintf("--initial-advertise-peer-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).%s:2380", scheme, ec.Name, suffix),
+		fmt.Sprintf("--advertise-client-urls=%s://$(POD_NAME).%s.$(POD_NAMESPACE).%s:2379", scheme, ec.Name, suffix),
 	)
 	if !tlsEnabled {
 		return args

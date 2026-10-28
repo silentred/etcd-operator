@@ -20,6 +20,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -1606,4 +1607,51 @@ func TestUpgradeCluster(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPinDomainSuffix covers the write-once pin semantics of
+// Status.DomainSuffix: resolved from the flag when absent, never re-derived
+// afterwards.
+func TestPinDomainSuffix(t *testing.T) {
+	newCluster := func(suffix string) *ecv1alpha1.EtcdCluster {
+		return &ecv1alpha1.EtcdCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "etcd", Namespace: "default"},
+			Status:     ecv1alpha1.EtcdClusterStatus{DomainSuffix: suffix},
+		}
+	}
+
+	t.Run("empty status pins the flag's short form", func(t *testing.T) {
+		r := &EtcdClusterReconciler{}
+		ec := newCluster("")
+		r.pinDomainSuffix(ec, logr.Discard())
+		assert.Equal(t, "svc", ec.Status.DomainSuffix)
+	})
+
+	t.Run("empty status pins the flag's full form", func(t *testing.T) {
+		r := &EtcdClusterReconciler{ServiceDNSDomain: "cluster.local"}
+		ec := newCluster("")
+		r.pinDomainSuffix(ec, logr.Discard())
+		assert.Equal(t, "svc.cluster.local", ec.Status.DomainSuffix)
+	})
+
+	t.Run("already-pinned value survives a flag change", func(t *testing.T) {
+		r := &EtcdClusterReconciler{ServiceDNSDomain: "example.com"}
+		ec := newCluster("svc.cluster.local")
+		r.pinDomainSuffix(ec, logr.Discard())
+		assert.Equal(t, "svc.cluster.local", ec.Status.DomainSuffix)
+	})
+}
+
+// TestClusterDNSSuffix covers the read path: the pinned Status value when
+// present, and the short "svc" fallback for clusters not yet pinned.
+func TestClusterDNSSuffix(t *testing.T) {
+	t.Run("pinned value is returned", func(t *testing.T) {
+		ec := &ecv1alpha1.EtcdCluster{Status: ecv1alpha1.EtcdClusterStatus{DomainSuffix: "svc.example.com"}}
+		assert.Equal(t, "svc.example.com", clusterDNSSuffix(ec))
+	})
+
+	t.Run("empty status falls back to the short form", func(t *testing.T) {
+		ec := &ecv1alpha1.EtcdCluster{}
+		assert.Equal(t, "svc", clusterDNSSuffix(ec))
+	})
 }

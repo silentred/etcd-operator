@@ -41,6 +41,10 @@ type clusterHashInput struct {
 // particular a PodTemplate without a Spec — metadata only — hashes like no
 // PodTemplate at all.
 //
+// The member DNS suffix enters the hash through the cluster's pinned
+// Status.DomainSuffix, so it reflects what the operator actually provisioned
+// rather than the currently-configured flag (which may have changed since).
+//
 // NOTE: changing this function or any whitelisted nested type (StorageSpec,
 // TLSCertificate, PodSpec) changes every hash output. After an operator
 // upgrade, every existing Pod's stored hash annotation would then look
@@ -53,8 +57,9 @@ func EtcdClusterHash(ec *v1alpha1.EtcdCluster) string {
 		StorageSpec:   ec.Spec.StorageSpec,
 		TLS:           ec.Spec.TLS,
 		// Hash the effective argument list: operator default arguments
-		// (including the TLS-dependent ones) merged with the user's options,
-		// so the hash reflects what the etcd process actually runs.
+		// (including the TLS-dependent ones and the member FQDNs built from
+		// Status.DomainSuffix) merged with the user's options, so the hash
+		// reflects what the etcd process actually runs.
 		EtcdOptions: createArgs(ec),
 	}
 	if ec.Spec.PodTemplate != nil {

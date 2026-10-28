@@ -211,11 +211,12 @@ func createHeadlessServiceIfNotExist(ctx context.Context, logger logr.Logger, c 
 // peerEndpointForOrdinalIndex returns the member name and peer URL for a given
 // ordinal, used both to build ETCD_INITIAL_CLUSTER and to call AddMember. The
 // peer URL scheme reflects the cluster's TLS configuration (https when TLS is
-// configured, http otherwise).
+// configured, http otherwise). The FQDN suffix comes from the cluster's pinned
+// Status.DomainSuffix (see clusterDNSSuffix).
 func peerEndpointForOrdinalIndex(ec *ecv1alpha1.EtcdCluster, index int) (string, string) {
 	name := fmt.Sprintf("%s-%d", ec.Name, index)
-	return name, fmt.Sprintf("%s://%s-%d.%s.%s.svc.cluster.local:2380",
-		clusterScheme(clusterTLSEnabled(ec)), ec.Name, index, ec.Name, ec.Namespace)
+	return name, fmt.Sprintf("%s://%s-%d.%s.%s.%s:2380",
+		clusterScheme(clusterTLSEnabled(ec)), ec.Name, index, ec.Name, ec.Namespace, clusterDNSSuffix(ec))
 }
 
 // getMemberNameFromPeerURL returns the {cluster}-{ordinal} member name
@@ -279,9 +280,10 @@ func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Confi
 			IPs:      make([]net.IP, len(cmConfig.AltNames.DNSNames)),
 		}
 	} else {
+		suffix := clusterDNSSuffix(ec)
 		defaultDNSNames := []string{
-			fmt.Sprintf("*.%s.%s.%s", ec.Name, ec.Namespace, certInterface.DefaultDomainName),
-			fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, certInterface.DefaultDomainName),
+			fmt.Sprintf("*.%s.%s.%s", ec.Name, ec.Namespace, suffix),
+			fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, suffix),
 		}
 		getAltNames = certInterface.AltNames{DNSNames: defaultDNSNames}
 	}
@@ -301,9 +303,10 @@ func createCMCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Confi
 func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Config, error) {
 	autoConfig := ec.Spec.TLS.ProviderCfg.AutoCfg
 	if autoConfig == nil {
+		suffix := clusterDNSSuffix(ec)
 		autoConfig = &ecv1alpha1.ProviderAutoConfig{
 			CommonConfig: ecv1alpha1.CommonConfig{
-				CommonName:       fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, certInterface.DefaultDomainName),
+				CommonName:       fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, suffix),
 				ValidityDuration: certInterface.DefaultAutoValidity.String(),
 			},
 		}
@@ -321,9 +324,10 @@ func createAutoCertificateConfig(ec *ecv1alpha1.EtcdCluster) (*certInterface.Con
 			IPs:      make([]net.IP, len(autoConfig.AltNames.DNSNames)),
 		}
 	} else {
+		suffix := clusterDNSSuffix(ec)
 		defaultDNSNames := []string{
-			fmt.Sprintf("*.%s.%s.%s", ec.Name, ec.Namespace, certInterface.DefaultDomainName),
-			fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, certInterface.DefaultDomainName),
+			fmt.Sprintf("*.%s.%s.%s", ec.Name, ec.Namespace, suffix),
+			fmt.Sprintf("%s.%s.%s", ec.Name, ec.Namespace, suffix),
 		}
 		altNames = certInterface.AltNames{DNSNames: defaultDNSNames}
 	}

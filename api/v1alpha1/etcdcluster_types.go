@@ -98,7 +98,9 @@ type ProviderConfig struct {
 
 type AltNames struct {
 	// DNSNames is the expected array of DNS subject alternative names.
-	// if empty defaults to $(POD_NAME).$(ETCD_CLUSTER_NAME).$(POD_NAMESPACE).svc.cluster.local
+	// if empty defaults to the member FQDN suffix built from the operator's
+	// --service-dns-domain flag: $(POD_NAME).$(ETCD_CLUSTER_NAME).$(POD_NAMESPACE).svc
+	// (adding .<domain> when the flag is set).
 	// +optional
 	DNSNames []string `json:"dnsNames,omitempty"`
 
@@ -219,6 +221,16 @@ type EtcdClusterStatus struct {
 	// to decide anything.
 	// +optional
 	LastRecoveredFrom string `json:"lastRecoveredFrom,omitempty"`
+
+	// DomainSuffix is the DNS suffix the operator appends to every member
+	// FQDN (e.g. "svc.cluster.local", or the short "svc" when no service
+	// DNS domain is configured). It is resolved from the operator's
+	// --service-dns-domain flag on the first reconcile and pinned afterwards:
+	// later flag changes never update an existing cluster, because the
+	// suffix is baked into each member's etcd arguments and certificate
+	// SANs. Read-only for users.
+	// +optional
+	DomainSuffix string `json:"domainSuffix,omitempty"`
 
 	// Members provides the status of each individual etcd member.
 	// +optional

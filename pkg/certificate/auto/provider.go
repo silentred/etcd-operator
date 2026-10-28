@@ -242,7 +242,7 @@ func checkKeyPair(cert *x509.Certificate, privateKey crypto.PrivateKey) error {
 // createNewSecret generates or updates a Kubernetes TLS Secret
 // with a self-signed certificate in the specified namespace.
 // DNSNames and IPAddresses if not user-defined, will be set to default value in runtime:
-// fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", ec.Name, index, ec.Name, ec.Namespace)
+// defaults built from the operator's --service-dns-domain flag (see memberDNSSuffix)
 // minimum validityDuration is 365 days
 // https://github.com/etcd-io/etcd/blob/b87bc1c3a275d7d4904f4d201b963a2de2264f0d/client/pkg/transport/listener.go#L275
 func (ac *Provider) createNewSecret(ctx context.Context, secretKey client.ObjectKey,

@@ -308,7 +308,7 @@ func (cm *CertManagerProvider) validateCertificateConfig(ctx context.Context, na
 
 // createCertificate creates a cert-manager Certificate resource in the specified namespace.
 // DNSNames and IPAddresses if not user-defined, will be set to default value in runtime:
-// fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", ec.Name, index, ec.Name, ec.Namespace)
+// defaults built from the operator's --service-dns-domain flag (see memberDNSSuffix)
 // returns an error if the Certificate resource cannot be created.
 func (cm *CertManagerProvider) createCertificate(ctx context.Context, secretKey client.ObjectKey,
 	cfg *interfaces.Config) error {

@@ -238,13 +238,13 @@ func TestCreateAutoCertificateConfig(t *testing.T) {
 				},
 			},
 			expected: &certInterface.Config{
-				CommonName:       "test-cluster.test-namespace.svc.cluster.local",
+				CommonName:       "test-cluster.test-namespace.svc",
 				Organization:     nil,
 				ValidityDuration: certInterface.DefaultAutoValidity,
 				AltNames: certInterface.AltNames{
 					DNSNames: []string{
-						"*.test-cluster.test-namespace.svc.cluster.local",
-						"test-cluster.test-namespace.svc.cluster.local",
+						"*.test-cluster.test-namespace.svc",
+						"test-cluster.test-namespace.svc",
 					},
 				},
 			},
@@ -376,8 +376,8 @@ func TestPeerEndpointForOrdinal(t *testing.T) {
 	assert.Equal(t, wantName, httpName)
 	assert.Equal(t, wantName, httpsName)
 
-	assert.Equal(t, "http://test-cluster-0.test-cluster.default.svc.cluster.local:2380", httpURL)
-	assert.Equal(t, "https://test-cluster-0.test-cluster.default.svc.cluster.local:2380", httpsURL)
+	assert.Equal(t, "http://test-cluster-0.test-cluster.default.svc:2380", httpURL)
+	assert.Equal(t, "https://test-cluster-0.test-cluster.default.svc:2380", httpsURL)
 }
 
 // ---------------------------------------------------------------------------
@@ -392,17 +392,17 @@ func TestGetMemberNameFromPeerURL(t *testing.T) {
 	}{
 		{
 			name:     "http peer URL",
-			peerURL:  "http://etcd-0.etcd.default.svc.cluster.local:2380",
+			peerURL:  "http://etcd-0.etcd.default.svc:2380",
 			wantName: "etcd-0",
 		},
 		{
 			name:     "https peer URL",
-			peerURL:  "https://etcd-12.etcd.kube-system.svc.cluster.local:2380",
+			peerURL:  "https://etcd-12.etcd.kube-system.svc:2380",
 			wantName: "etcd-12",
 		},
 		{
 			name:     "cluster name containing dashes and digits",
-			peerURL:  "http://my-cluster-2-1.my-cluster-2.default.svc.cluster.local:2380",
+			peerURL:  "http://my-cluster-2-1.my-cluster-2.default.svc:2380",
 			wantName: "my-cluster-2-1",
 		},
 		{
@@ -417,7 +417,7 @@ func TestGetMemberNameFromPeerURL(t *testing.T) {
 		},
 		{
 			name:     "missing scheme has no host",
-			peerURL:  "etcd-0.etcd.default.svc.cluster.local:2380",
+			peerURL:  "etcd-0.etcd.default.svc:2380",
 			wantName: "",
 		},
 		{

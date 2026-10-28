@@ -25,6 +25,7 @@ import (
 	"time"
 
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -63,6 +64,12 @@ type EtcdClusterReconciler struct {
 	Scheme        *runtime.Scheme
 	Recorder      events.EventRecorder
 	ImageRegistry string
+	// ServiceDNSDomain is the Kubernetes service DNS suffix used to build
+	// member FQDNs and default cert SANs. See the --service-dns-domain flag.
+	// It is only consulted once per cluster — the resolved suffix is pinned
+	// into EtcdCluster.Status.DomainSuffix on the first reconcile and never
+	// re-derived afterwards (see pinDomainSuffix).
+	ServiceDNSDomain string
 }
 
 // reconcileState holds all transient data for a single reconciliation loop.
@@ -202,6 +209,9 @@ func (r *EtcdClusterReconciler) fetchAndValidateState(ctx context.Context, req c
 	// cert wiring) all see consistent values regardless of which fields the
 	// user left empty.
 	r.PopulateDefaultValues(ec)
+	// Pin the effective member DNS suffix before anything that builds member
+	// FQDNs (hash, pod args, cert SANs) runs downstream.
+	r.pinDomainSuffix(ec, logger)
 
 	members, err := listOwnedMembers(ctx, r.Client, ec)
 	if err != nil {
@@ -226,6 +236,26 @@ func (r *EtcdClusterReconciler) fetchAndValidateState(ctx context.Context, req c
 func (r *EtcdClusterReconciler) PopulateDefaultValues(ec *ecv1alpha1.EtcdCluster) {
 	if ec.Spec.ImageRegistry == "" {
 		ec.Spec.ImageRegistry = r.ImageRegistry
+	}
+}
+
+// pinDomainSuffix resolves EtcdCluster.Status.DomainSuffix from the
+// reconciler's --service-dns-domain flag: set on the first reconcile, never
+// re-derived afterwards. The suffix is baked into every member's etcd
+// arguments (--initial-cluster, advertise URLs) and certificate SANs, so
+// changing it on a running cluster cannot be done by rolling pods — it would
+// require re-creating the cluster. A flag change therefore only affects
+// clusters that have not been reconciled yet; the mismatch is logged so the
+// operator stays visible.
+func (r *EtcdClusterReconciler) pinDomainSuffix(ec *ecv1alpha1.EtcdCluster, logger logr.Logger) {
+	resolved := memberDNSSuffix(r.ServiceDNSDomain)
+	if ec.Status.DomainSuffix == "" {
+		ec.Status.DomainSuffix = resolved
+		return
+	}
+	if ec.Status.DomainSuffix != resolved {
+		logger.Info("cluster's pinned domain suffix differs from the current --service-dns-domain; keeping the pinned value",
+			"cluster", ec.Name, "pinnedSuffix", ec.Status.DomainSuffix, "currentSuffix", resolved)
 	}
 }
 

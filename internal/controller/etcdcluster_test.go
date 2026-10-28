@@ -227,9 +227,11 @@ func TestEtcdClusterHash(t *testing.T) {
 // the schema change should affect the hash before updating
 // expectedEmptySpecHash.
 func TestEtcdClusterHashPinned(t *testing.T) {
-	// Captured for an all-zero-value EtcdClusterSpec at commit
-	// 5483df641bf23347d98a56b8d966bc2c495edcb5.
-	const expectedEmptySpecHash = "f71305f40ce2"
+	// Captured for an all-zero-value EtcdClusterSpec with an empty
+	// --service-dns-domain (the operator default, whose member FQDNs use
+	// the short "svc" suffix). Previously "f71305f40ce2" when member FQDNs
+	// hardcoded "svc.cluster.local"; see memberDNSSuffix.
+	const expectedEmptySpecHash = "77e7c862d3c2"
 	currentHash := EtcdClusterHash(&v1alpha1.EtcdCluster{Spec: v1alpha1.EtcdClusterSpec{}})
 	assert.Equal(t, expectedEmptySpecHash, currentHash,
 		"hash input changed, see comment above before updating this constant")
