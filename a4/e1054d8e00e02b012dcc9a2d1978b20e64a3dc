@@ -1,0 +1,14 @@
+docs/api-references/docs.md
+  h_c0d7905c95f933 14-15,116-195,221-255,273-290,305,367-382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a4e1054d8e00e02b012dcc9a2d1978b20e64a3dc",
+  "prompts": {},
+  "humans": {
+    "h_c0d7905c95f933": {
+      "author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
