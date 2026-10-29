@@ -1,0 +1,19 @@
+test/e2e/etcd_options_test.go
+  s_6c087b8ff46f22::t_c3f9e2db42cdb5 50-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d651f08923dc4c482aeed940bea02746d1a270e2",
+  "prompts": {},
+  "sessions": {
+    "s_6c087b8ff46f22": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "5005c096-e508-497f-803e-8a1f3804f110",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
