@@ -1,0 +1,14 @@
+test/e2e/helpers_test.go
+  h_c0d7905c95f933 556
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "de9ecc959faf0622068325b56ff4d816721080ce",
+  "prompts": {},
+  "humans": {
+    "h_c0d7905c95f933": {
+      "author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
