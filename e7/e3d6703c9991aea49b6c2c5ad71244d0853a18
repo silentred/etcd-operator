@@ -1,0 +1,14 @@
+Makefile
+  h_c0d7905c95f933 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e7e3d6703c9991aea49b6c2c5ad71244d0853a18",
+  "prompts": {},
+  "humans": {
+    "h_c0d7905c95f933": {
+      "author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
