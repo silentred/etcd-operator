@@ -1,0 +1,19 @@
+test/e2e/service_dns_domain_test.go
+  s_87f43b5a081f90::t_0b340dba6a33cc 100-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6247f2a837078af2bfc2a927e192dc15cbd47670",
+  "prompts": {},
+  "sessions": {
+    "s_87f43b5a081f90": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "e69663c5-86d9-4983-8a0c-52bf749d9423",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
