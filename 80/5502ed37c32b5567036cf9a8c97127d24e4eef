@@ -1,0 +1,37 @@
+internal/controller/etcdcluster_controller.go
+  s_c3cc611f71bb8e::t_1b48b536bbee83 767-768
+  s_c3cc611f71bb8e::t_a089ae059dd5dc 763-766,769-770
+  s_c3cc611f71bb8e::t_5dd3ac96a021a8 742-762
+docs/api-references/docs.md
+  s_c3cc611f71bb8e::t_6acd396cb5f370 420-436
+api/v1alpha1/etcdcluster_types.go
+  s_c3cc611f71bb8e::t_fac07f627cd01f 284-295
+  s_c3cc611f71bb8e::t_e880351f4be210 223-234
+  s_c3cc611f71bb8e::t_5cacbf269a2ce3 235-242
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_c3cc611f71bb8e::t_d01ee9c9fb225a 1290-1301
+  s_c3cc611f71bb8e::t_0a70952f0ad568 1288-1289,1302-1304,1441-1457
+api/v1alpha1/zz_generated.deepcopy.go
+  s_c3cc611f71bb8e::t_0a70952f0ad568 197-206,554-565,568
+  s_c3cc611f71bb8e::t_6ffcda8c579c27 566-567
+internal/controller/etcdcluster_controller_test.go
+  s_c3cc611f71bb8e::t_fed718a9be2e6d 608-609,611-612,617-621,629,639,641,645,653,656,703,727,729,741-742
+  s_c3cc611f71bb8e::t_49b5013ac43b3c 20
+  s_c3cc611f71bb8e::t_d23ae50067982d 610,613-616,622-628,630-638,640,642-644,646-652,654-655,657-702,704-726,728,730-740
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "805502ed37c32b5567036cf9a8c97127d24e4eef",
+  "prompts": {},
+  "sessions": {
+    "s_c3cc611f71bb8e": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "f58d26cd-c964-4f5c-bdae-8f57fb9db4a2",
+        "model": "glink/Qwen3.8-2.4T-A95B:glink_domestic"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
