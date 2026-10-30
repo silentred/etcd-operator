@@ -1,0 +1,23 @@
+internal/controller/pods.go
+  s_87f43b5a081f90::t_aad213b3a7ea9f 147
+  s_87f43b5a081f90::t_e2260d7817dd7d 178
+test/e2e/service_dns_domain_test.go
+  s_87f43b5a081f90::t_c09f00674be169 54-61,72-73,79-86,99
+  s_87f43b5a081f90::t_2d1baa5b095b57 1-53,62-71,74-78,87-98,100-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "360da6b0b20618b70010cf747e56f773ea253aba",
+  "prompts": {},
+  "sessions": {
+    "s_87f43b5a081f90": {
+      "agent_id": {
+        "tool": "antcc",
+        "id": "e69663c5-86d9-4983-8a0c-52bf749d9423",
+        "model": "antchat/GLM-5.3"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
