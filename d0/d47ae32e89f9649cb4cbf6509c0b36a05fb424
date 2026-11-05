@@ -1,0 +1,20 @@
+test/e2e/service_dns_domain_test.go
+  s_592920bab2508d::t_77b32e1a72019c 97,112-113,120
+  s_592920bab2508d::t_a0a6201a044090 114-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d0d47ae32e89f9649cb4cbf6509c0b36a05fb424",
+  "prompts": {},
+  "sessions": {
+    "s_592920bab2508d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1aae5-8702-7fa0-bd45-4b6a8ad90fed",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
