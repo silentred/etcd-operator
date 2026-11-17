@@ -1,0 +1,23 @@
+cmd/main_test.go
+  s_042e038e7654dc::t_fb7e901cfe9592 17-70
+  s_042e038e7654dc::t_4320c0cfd29474 1-16
+cmd/main.go
+  s_042e038e7654dc::t_7f33f6023a738b 22,24,29,33,70,72-73,99-104,148,197-212
+  s_042e038e7654dc::t_7c44dcf6b473e9 213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dbf1d8816b492f7671479c91076d71dddeeac92f",
+  "prompts": {},
+  "sessions": {
+    "s_042e038e7654dc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e831-86ac-7480-b782-9f762bc0c18b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
