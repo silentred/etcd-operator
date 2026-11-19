@@ -1,0 +1,35 @@
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_35abfa8302da05::t_d7731dab52037d 6,1021-1022,1032-1034,1036-1044
+docs/api-references/docs.md
+  s_35abfa8302da05::t_dd5075d7020fb2 289-310
+internal/controller/resources_test.go
+  s_35abfa8302da05::t_214b1d9666e246 17-18,30
+  s_35abfa8302da05::t_dd5075d7020fb2 4,27
+  s_35abfa8302da05::t_c6a7870ea48a12 1-3,5-16,19-26,28-29,31-66
+internal/controller/pods.go
+  s_35abfa8302da05::t_2fbaf1e32bb431 387-391
+api/v1alpha1/zz_generated.deepcopy.go
+  s_35abfa8302da05::t_d7731dab52037d 405,518-534,537
+  s_35abfa8302da05::t_126983dc2627f9 535-536,538-539
+api/v1alpha1/etcdcluster_types.go
+  s_35abfa8302da05::t_2fbaf1e32bb431 82-94
+internal/controller/pods_test.go
+  s_35abfa8302da05::t_33a194df060630 1070,1080-1081,1084,1096-1100
+  s_35abfa8302da05::t_2fbaf1e32bb431 1040,1071,1085
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "49ebd44296c43553e20f335b73ea43b09b20c5da",
+  "prompts": {},
+  "sessions": {
+    "s_35abfa8302da05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2eb-3970-7e92-ae3f-c89d590a2253",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
