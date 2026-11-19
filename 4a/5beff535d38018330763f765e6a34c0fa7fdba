@@ -1,0 +1,28 @@
+api/v1alpha1/zz_generated.deepcopy.go
+  s_8288e3df0546a9::t_b4861efcb729dc 403-407
+config/crd/bases/operator.etcd.io_etcdclusters.yaml
+  s_8288e3df0546a9::t_b4861efcb729dc 1020-1079
+internal/controller/pods.go
+  s_8288e3df0546a9::t_b4861efcb729dc 384-388
+internal/controller/pods_test.go
+  s_8288e3df0546a9::t_edd9ffbbff994d 1034-1114
+  s_8288e3df0546a9::t_83fc3951db3ef3 12
+api/v1alpha1/etcdcluster_types.go
+  s_8288e3df0546a9::t_b4861efcb729dc 82-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4a5beff535d38018330763f765e6a34c0fa7fdba",
+  "prompts": {},
+  "sessions": {
+    "s_8288e3df0546a9": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1f2ac-1f69-709f-8492-6ecbdcecd6b4",
+        "model": "model-fable"
+      },
+      "human_author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
