@@ -1,0 +1,16 @@
+api/v1alpha1/etcdcluster_types.go
+  h_c0d7905c95f933 83
+docs/api-references/docs.md
+  h_c0d7905c95f933 289
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7fb1c68de8729506420200f2db3bf821ce1be8c7",
+  "prompts": {},
+  "humans": {
+    "h_c0d7905c95f933": {
+      "author": "shenmu.wy <shenmu.wy@antfin.com>"
+    }
+  }
+}
